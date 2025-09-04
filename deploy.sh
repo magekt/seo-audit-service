@@ -13,10 +13,10 @@ if ! command -v gcloud &> /dev/null; then
 fi
 
 # Set variables (UPDATE THESE)
-PROJECT_ID="your-gcp-project-id"
+PROJECT_ID="websleuth-1i6dd"
 REGION="us-central1"
 SERVICE_NAME="seo-audit-tool"
-ZENSERP_API_KEY="your-zenserp-api-key"
+ZENSERP_API_KEY="d913d650-897e-11f0-ac57-25719dc87a5e"
 
 echo "📋 Configuration:"
 echo "  Project ID: $PROJECT_ID"
