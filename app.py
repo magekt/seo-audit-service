@@ -190,5 +190,10 @@ def internal_error(error):
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_ENV') == 'development')
+    port = int(os.environ.get('PORT', 8080))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    print(f"🚀 Starting Flask app on port {port}")
+    print(f"🔑 ZenSERP API: {'✅ Configured' if analyzer.zenserp_api_key else '❌ Missing'}")
+    
+    app.run(host='0.0.0.0', port=port, debug=debug)
