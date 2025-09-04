@@ -1,105 +1,53 @@
 #!/bin/bash
 
-# 🚀 Google Cloud Deployment Script for SEO Audit Tool
+echo "🚀 Simple SEO Audit Tool Deployment"
+echo "==================================="
 
-echo "🌐 SEO Audit Tool - Google Cloud Deployment"
-echo "============================================"
+# Update this with your actual ZenSERP API key
+ZENSERP_API_KEY="your-actual-zenserp-api-key-here"
 
-# Check if gcloud is installed
-if ! command -v gcloud &> /dev/null; then
-    echo "❌ Google Cloud CLI not found. Please install it first:"
-    echo "   https://cloud.google.com/sdk/docs/install"
+if [ "$ZENSERP_API_KEY" = "your-actual-zenserp-api-key-here" ]; then
+    echo "❌ Please edit this script and add your actual ZenSERP API key!"
+    echo "   Edit line 7 in simple-deploy.sh"
     exit 1
 fi
 
-# Set variables (UPDATE THESE)
-PROJECT_ID="your-gcp-project-id"
-REGION="us-central1"
-SERVICE_NAME="seo-audit-tool"
-ZENSERP_API_KEY="your-zenserp-api-key"
-
-echo "📋 Configuration:"
-echo "  Project ID: $PROJECT_ID"
-echo "  Region: $REGION"
-echo "  Service: $SERVICE_NAME"
+echo "📋 Project: seo-audit-tool-2025"
+echo "📋 API Key: ${ZENSERP_API_KEY:0:10}..."
 echo ""
 
-# Set the project
-echo "🔧 Setting up project..."
-gcloud config set project $PROJECT_ID
+# Set project
+gcloud config set project seo-audit-tool-2025
 
-# Enable required APIs
+# Enable APIs with explicit confirmation
 echo "🔌 Enabling required APIs..."
-gcloud services enable run.googleapis.com
-gcloud services enable cloudbuild.googleapis.com
-gcloud services enable containerregistry.googleapis.com
+gcloud services enable run.googleapis.com --quiet
+gcloud services enable cloudbuild.googleapis.com --quiet  
+gcloud services enable containerregistry.googleapis.com --quiet
 
-# Create secrets
-echo "🔐 Creating secrets..."
-echo -n "$ZENSERP_API_KEY" | gcloud secrets create zenserp-api-key --data-file=-
-echo -n "$(openssl rand -base64 32)" | gcloud secrets create flask-secret --data-file=-
+echo "⏱️ Waiting 30 seconds for APIs to be ready..."
+sleep 30
 
-echo "🎯 Choose deployment option:"
-echo "1) Google Cloud Run (Full Flask app)"
-echo "2) Google Cloud Functions (Serverless function)"
-read -p "Enter choice (1 or 2): " choice
+# Deploy directly to Cloud Run
+echo "🚀 Deploying to Cloud Run..."
+gcloud run deploy seo-audit-tool \
+    --source . \
+    --platform managed \
+    --region us-central1 \
+    --allow-unauthenticated \
+    --memory 2Gi \
+    --cpu 2 \
+    --timeout 900 \
+    --max-instances 10 \
+    --set-env-vars ZENSERP_API_KEY="$ZENSERP_API_KEY",FLASK_ENV=production
 
-if [ "$choice" = "1" ]; then
-    echo "🚀 Deploying to Google Cloud Run..."
-
-    # Build and deploy to Cloud Run
-    gcloud builds submit --tag gcr.io/$PROJECT_ID/$SERVICE_NAME
-
-    gcloud run deploy $SERVICE_NAME \
-        --image gcr.io/$PROJECT_ID/$SERVICE_NAME \
-        --platform managed \
-        --region $REGION \
-        --allow-unauthenticated \
-        --memory 2Gi \
-        --cpu 2 \
-        --timeout 900 \
-        --max-instances 10 \
-        --set-secrets ZENSERP_API_KEY=zenserp-api-key:latest,SECRET_KEY=flask-secret:latest
-
-elif [ "$choice" = "2" ]; then
-    echo "⚡ Deploying to Google Cloud Functions..."
-
-    # Enable Cloud Functions API
-    gcloud services enable cloudfunctions.googleapis.com
-
-    # Deploy Cloud Function
-    gcloud functions deploy seo-audit \
-        --runtime python39 \
-        --trigger-http \
-        --allow-unauthenticated \
-        --memory 2048MB \
-        --timeout 540s \
-        --set-env-vars ZENSERP_API_KEY=$ZENSERP_API_KEY \
-        --entry-point seo_audit_function \
-        --source . \
-        --requirements-file requirements-functions.txt
-
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✅ Deployment successful!"
+    SERVICE_URL=$(gcloud run services describe seo-audit-tool --region=us-central1 --format="value(status.url)")
+    echo "🔗 Your SEO Audit Tool: $SERVICE_URL"
+    echo ""
+    echo "🎉 Test it now by opening the URL above!"
 else
-    echo "❌ Invalid choice. Exiting."
-    exit 1
+    echo "❌ Deployment failed. Check the errors above."
 fi
-
-echo "✅ Deployment completed!"
-echo ""
-echo "🌐 Your SEO Audit Tool is now live!"
-
-if [ "$choice" = "1" ]; then
-    SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(status.url)")
-    echo "🔗 Cloud Run URL: $SERVICE_URL"
-elif [ "$choice" = "2" ]; then
-    FUNCTION_URL=$(gcloud functions describe seo-audit --format="value(httpsTrigger.url)")
-    echo "🔗 Cloud Functions URL: $FUNCTION_URL"
-fi
-
-echo ""
-echo "💰 Free Tier Limits:"
-echo "  • Cloud Run: 2 million requests/month"
-echo "  • Cloud Functions: 2 million invocations/month"
-echo "  • Container Registry: 0.5GB storage"
-echo ""
-echo "🎉 Happy SEO auditing!"
