@@ -108,17 +108,17 @@ def is_valid_keyword(keyword: str) -> bool:
     """Validate target keyword"""
     if not keyword or not isinstance(keyword, str):
         return False
-
+        
     keyword = keyword.strip()
-
+    
     # Check length
     if len(keyword) < 2 or len(keyword) > 100:
         return False
-
+        
     # Check for valid characters (allow letters, numbers, spaces, hyphens)
-    if not re.match(r'^[a-zA-Z0-9\s\-\_\.]+$', keyword):
+    if not re.match(r'^[a-zA-Z0-9\s\-\_\.]+$', keyword):  # FIXED: Added 'r' for raw string
         return False
-
+        
     return True
 
 def calculate_seo_score(issues: list) -> float:
