@@ -1050,6 +1050,40 @@ class EnhancedSEOCrawler:
         
         return self.pages_data, self.stats
 
+    def _discover_links_from_page(self, soup: BeautifulSoup, current_url: str, domain: str) -> List[str]:
+        """Discover additional links from the current page for selective analysis"""
+        new_urls = []
+        
+        # Find all internal links
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            
+            # Skip javascript, mailto, tel, and anchor links
+            if href.startswith(('javascript:', 'mailto:', 'tel:', '#')):
+                continue
+                
+            try:
+                if href.startswith('/'):
+                    absolute_url = urljoin(current_url, href)
+                elif href.startswith('http'):
+                    absolute_url = href
+                else:
+                    absolute_url = urljoin(current_url, href)
+                    
+                parsed_url = urlparse(absolute_url)
+                
+                # Only include URLs from the same domain
+                if parsed_url.netloc == domain:
+                    # Clean URL (remove fragments and query params for basic pages)
+                    clean_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+                    if clean_url not in self.crawled_urls:
+                        new_urls.append(clean_url)
+                        
+            except Exception:
+                continue
+                
+        return new_urls[:10]  # Limit to 10 new URLs per page
+
 class EnhancedSEOEngine:
     """Enhanced SEO analysis engine with comprehensive features"""
 
