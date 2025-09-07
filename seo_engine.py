@@ -125,6 +125,7 @@ class CacheManager:
     def _init_db(self):
         """Initialize SQLite database for caching"""
         with sqlite3.connect(self.db_path) as conn:
+            # Create tables first
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS page_cache (
                     url TEXT PRIMARY KEY,
@@ -136,6 +137,7 @@ class CacheManager:
                     analysis_count INTEGER DEFAULT 1
                 )
             """)
+            
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS analysis_sessions (
                     session_id TEXT PRIMARY KEY,
@@ -148,11 +150,12 @@ class CacheManager:
                     status TEXT
                 )
             """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_domain ON page_cache(domain);
-                CREATE INDEX IF NOT EXISTS idx_created ON page_cache(created_at);
-                CREATE INDEX IF NOT EXISTS idx_session_domain ON analysis_sessions(domain);
-            """)
+            
+            # Create indexes separately - ONE AT A TIME
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_domain ON page_cache(domain)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON page_cache(created_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_session_domain ON analysis_sessions(domain)")
+
 
     def get_cached_page(self, url: str, max_age_hours: int = 24) -> Optional[SEOPageData]:
         """Retrieve cached page data if available and not expired"""
