@@ -4,7 +4,8 @@ services:
   - type: web
     name: seo-audit-tool-v3-enhanced
     env: python
-    plan: starter  # Can be upgraded to standard/pro for production
+    plan: starter
+    runtime: python-3.11  # ADD THIS LINE TO FORCE PYTHON 3.11
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
@@ -13,7 +14,7 @@ services:
       python run.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.6  # CHANGE FROM 3.11.0 TO 3.11.6
       - key: FLASK_ENV
         value: production
       - key: PORT
