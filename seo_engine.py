@@ -12,6 +12,7 @@ import re
 import os
 import pickle
 import hashlib
+import xml.etree.ElementTree as ET  # ADD THIS LINE
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, quote_plus, unquote
 from urllib.robotparser import RobotFileParser
