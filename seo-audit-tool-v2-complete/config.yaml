@@ -5,7 +5,7 @@ secret_key: "dev-secret-key-12345"
 
 # Server Configuration
 host: "0.0.0.0"
-port: 8080
+port: 10000
 
 # Features
 serp_analysis_enabled: true
@@ -15,7 +15,7 @@ caching_enabled: true
 rate_limiting_enabled: false
 
 # Crawling settings
-max_pages_limit: 10
+max_pages_limit: 987
 max_concurrent_requests: 2
 request_delay: 1.5
 request_timeout: 30
