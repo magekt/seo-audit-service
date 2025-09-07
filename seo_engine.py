@@ -362,22 +362,21 @@ class EnhancedSEOCrawler:
             self.stats.average_load_time = sum(page.load_time for page in self.pages_data) / len(self.pages_data)
 
     async def discover_urls(self, start_url: str) -> Set[str]:
-        """Discover all URLs associated with the domain"""
+        """Discover all URLs associated with the domain - FIXED for whole website"""
         logger.info(f"Starting URL discovery for {start_url}")
-
         parsed_url = urlparse(start_url)
         base_domain = parsed_url.netloc
         discovered = set()
-
+        
         # Check sitemap
         await self._check_sitemaps(start_url, discovered)
-
+        
         # Check robots.txt for additional sitemaps
         await self._check_robots_for_sitemaps(start_url, discovered)
-
-        # Recursive crawling for link discovery
-        await self._recursive_link_discovery(start_url, base_domain, discovered, max_depth=3)
-
+        
+        # FIXED: Recursive crawling for link discovery - increased limits
+        await self._recursive_link_discovery(start_url, base_domain, discovered, max_depth=4)
+        
         logger.info(f"Discovered {len(discovered)} URLs for domain {base_domain}")
         return discovered
 
@@ -466,33 +465,38 @@ class EnhancedSEOCrawler:
                 urls.add(line)
         return urls
 
-    async def _recursive_link_discovery(self, start_url: str, base_domain: str, discovered: Set[str], max_depth: int = 3, current_depth: int = 0):
-        """Recursively discover links from pages"""
-        if current_depth >= max_depth or len(discovered) > 1000:  # Limit to prevent infinite crawling
+    async def _recursive_link_discovery(self, start_url: str, base_domain: str, discovered: Set[str], 
+                                       max_depth: int = 4, current_depth: int = 0):
+        """Recursively discover links from pages - FIXED pagination"""
+        # FIXED: Increased limits for whole website discovery
+        if current_depth >= max_depth or len(discovered) > 2000:  # Increased from 1000 to 2000
             return
-
+            
         try:
             html, status_code, _, _ = await self.fetch_page(start_url)
             if html and status_code == 200:
                 soup = BeautifulSoup(html, 'html.parser')
-
+                
                 for link in soup.find_all('a', href=True):
                     href = link['href']
+                    
                     if href.startswith('/'):
                         full_url = urljoin(start_url, href)
                     elif href.startswith('http'):
                         full_url = href
                     else:
                         continue
-
+                        
                     parsed = urlparse(full_url)
                     if parsed.netloc == base_domain and full_url not in discovered:
                         discovered.add(full_url)
-
-                        # Recursively crawl important pages (limit to prevent explosion)
-                        if current_depth < 2 and len(discovered) < 500:
-                            await self._recursive_link_discovery(full_url, base_domain, discovered, max_depth, current_depth + 1)
-
+                        
+                        # FIXED: Continue recursive crawling with better limits
+                        if current_depth < 3 and len(discovered) < 1500:  # Increased limits
+                            await self._recursive_link_discovery(
+                                full_url, base_domain, discovered, max_depth, current_depth + 1
+                            )
+                            
         except Exception as e:
             logger.debug(f"Error in recursive discovery from {start_url}: {e}")
 
