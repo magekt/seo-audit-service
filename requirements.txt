@@ -1,40 +1,51 @@
-# Enhanced SEO Audit Tool V3.0 - Python 3.13 Compatible Requirements
+# Enhanced SEO Audit Tool V3.0 - Based on Working v2.0 Dependencies
 
-# Core Flask dependencies
+# Core framework and web server
 Flask==3.0.3
-Flask-CORS==4.0.1
+Werkzeug==3.0.3
+gunicorn==22.0.0
+flask-cors==4.0.1
 
-# HTTP and Web scraping
+# HTTP client libraries
 aiohttp==3.9.5
 requests==2.32.3
+urllib3==2.2.2
+
+# HTML parsing and web scraping
 beautifulsoup4==4.12.3
-lxml==5.3.0
+lxml==5.2.2
 
-# Data processing (Python 3.13 compatible versions) - MAIN FIX
-pandas==2.2.2
-numpy==2.1.1
+# Data manipulation and analysis (PROVEN WORKING VERSIONS)
+pandas>=2.2.0
+numpy>=1.26.0
+openpyxl==3.1.5
 
-# Validation and utilities
-validators==0.28.3
+# Configuration management
+PyYAML==6.0.1
+python-dotenv==1.0.1
+
+# Date/time utilities
 python-dateutil==2.9.0
 
-# Development and testing (optional)
-pytest==8.3.2
-pytest-asyncio==0.23.8
+# Progress bars and CLI utilities
+tqdm==4.66.4
+click==8.1.7
 
-# Additional SEO analysis dependencies
-Pillow==10.4.0
+# Validation and data processing
+validators==0.33.0
 
-# For enhanced features
+# Async utilities
+asyncio-throttle==1.0.2
+
+# Production monitoring
+structlog==24.4.0
+
+# SSL certificates
+certifi==2024.8.30
+
+# V3.0 Enhanced Features - Additional Dependencies
 sqlalchemy==2.0.25
 xmltodict==0.13.0
-
-# Security
 cryptography==43.0.0
-
-# Production server
-gunicorn==22.0.0
-waitress==3.0.0
-
-# Monitoring
+Pillow==10.4.0
 psutil==6.0.0
