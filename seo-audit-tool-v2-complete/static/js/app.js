@@ -69,7 +69,7 @@ async function handleFormSubmit(event) {
 
 async function startAnalysis(data) {
     isAnalyzing = true;
-    statusCheckRetries = 0;
+    statusCheckRetries = 1;
 
     updateUI('starting');
     showProgress('Starting analysis...', 0);
