@@ -615,3 +615,41 @@ body {
 .bounce-in {
     animation: bounceIn 0.8s ease;
 }
+
+/* ––––– NEO LAYOUT ADD-ONS ––––– */
+
+:root{
+  --neo-bg:#101518;
+  --neo-card:#1b2126;
+  --neo-text:#e8e9ea;
+  --neo-accent:#0d6efd;
+}
+.theme-light{
+  --neo-bg:#f8f9fa;
+  --neo-card:#ffffff;
+  --neo-text:#212529;
+}
+
+body{background:var(--neo-bg);color:var(--neo-text);}
+a{color:var(--neo-accent);}
+.neo-card{
+  background:var(--neo-card);
+  border-radius:.75rem;
+  padding:.9rem 1rem;
+  box-shadow:0 1px 4px rgba(0,0,0,.25);
+}
+.neo-stat{font-size:1.65rem;font-weight:700;color:var(--neo-accent);}
+.neo-form input,.neo-form select{background:var(--neo-card);border:none;color:var(--neo-text);}
+.neo-progress,.neo-result{background:var(--neo-card);padding:1.5rem;border-radius:.75rem;}
+.progress{background:#2a2f34}
+.progress-bar{background:var(--neo-accent);}
+.neo-report{max-height:65vh;overflow:auto;scroll-behavior:smooth;padding-right:.25rem;}
+.neo-report pre{white-space:pre-wrap;}
+#themeSwitch{
+  position:fixed;bottom:1rem;right:1rem;z-index:1030;
+  background:var(--neo-card);color:var(--neo-text);
+  border:none;padding:.4rem .9rem;font-size:.9rem;
+  box-shadow:0 2px 6px rgba(0,0,0,.4);
+}
+#themeSwitch:hover{background:var(--neo-accent);color:#fff;}
+
