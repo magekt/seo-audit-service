@@ -626,12 +626,15 @@ if __name__ == '__main__':
     os.makedirs('exports', exist_ok=True)
     os.makedirs('cache', exist_ok=True)
 
-    # Run enhanced application
+    # For local development only
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
-
+    
     logger.info(f"🚀 Starting Enhanced SEO Audit Tool V3.0 on port {port}")
     logger.info(f"🔧 Debug mode: {debug}")
     logger.info(f"📊 Enhanced features: SERP analysis, Smart caching, Whole website analysis")
-
+    
     app.run(host='0.0.0.0', port=port, debug=debug)
+
+# For gunicorn (production)
+application = app
