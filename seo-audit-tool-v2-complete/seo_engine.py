@@ -487,7 +487,7 @@ class SEOEngine:
         self.config = config
         self.logger = logging.getLogger(__name__)
     
-    def analyze_website(self, website_url: str, target_keyword: str, max_pages: int = 10) -> Dict:
+    def analyze_website(self, website_url: str, target_keyword: str, max_pages: int = 987) -> Dict:
         """Analyze website and return comprehensive report"""
         return asyncio.run(self._analyze_website_async(website_url, target_keyword, max_pages))
     
