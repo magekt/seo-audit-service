@@ -22,7 +22,7 @@ class Config:
     
     # Server Configuration
     host: str = "0.0.0.0"
-    port: int = 8080
+    port: int = 10000
     
     # API Keys
     google_api_key: Optional[str] = None
@@ -37,7 +37,7 @@ class Config:
     rate_limiting_enabled: bool = False
     
     # Crawling Configuration
-    max_pages_limit: int = 100
+    max_pages_limit: int = 987
     max_concurrent_requests: int = 3
     request_delay: float = 1.5
     request_timeout: int = 30
@@ -249,7 +249,7 @@ def save_config_template(output_file: str = "config.yaml") -> None:
         'version': '2.0.0',
         'secret_key': 'change-this-in-production',
         'host': '0.0.0.0',
-        'port': 8080,
+        'port': 1000,
         
         # API Keys (optional)
         'google_api_key': None,
@@ -264,7 +264,7 @@ def save_config_template(output_file: str = "config.yaml") -> None:
         'rate_limiting_enabled': False,
         
         # Crawling Configuration
-        'max_pages_limit': 100,
+        'max_pages_limit': 987,
         'max_concurrent_requests': 3,
         'request_delay': 1.5,
         'request_timeout': 30,
