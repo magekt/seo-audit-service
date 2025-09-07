@@ -26,7 +26,7 @@ from config import Config
 import utils
 
 # Enhanced logging configuration
-os.makedirs('logs', exist_ok=True) # CREATE LOGS DIRECTORY FIRST
+os.makedirs('logs', exist_ok=True)  # CREATE LOGS DIRECTORY FIRST
 os.makedirs('reports', exist_ok=True)
 os.makedirs('exports', exist_ok=True)
 os.makedirs('cache', exist_ok=True)
@@ -47,6 +47,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+
 logger = logging.getLogger(__name__)
 
 # Initialize enhanced components
@@ -132,14 +133,12 @@ class ProgressTracker:
 
 class EnhancedAnalysisManager:
     """Enhanced analysis manager with new features"""
-
     def __init__(self):
         self.active_analyses = {}
 
-    def start_enhanced_analysis(self, analysis_id: str, website_url: str, target_keyword: str, 
+    def start_enhanced_analysis(self, analysis_id: str, website_url: str, target_keyword: str,
                                max_pages: int, whole_website: bool = False):
         """Start enhanced SEO analysis with new features"""
-
         def run_enhanced_analysis():
             try:
                 time.sleep(0.5)  # Initial delay
@@ -161,15 +160,16 @@ class EnhancedAnalysisManager:
                 # Update status to running
                 with analyses_lock:
                     analyses[analysis_id]['status'] = 'running'
-                    analyses[analysis_id]['progress'] = 'Initializing enhanced SEO analysis with advanced features...'
+                    analyses[analysis_id]['progress'] = 'Initializing enhanced SEO analysis with advanced features'
 
                 logger.info(f"Starting enhanced analysis {analysis_id} for {website_url}")
 
                 # Enhanced progress tracking
                 progress_tracker = ProgressTracker(
-                    total_steps=7 if whole_website else 5, 
+                    total_steps=7 if whole_website else 5,
                     description=f"Enhanced SEO Analysis for {website_url}"
                 )
+
                 analyses[analysis_id]['progress_tracker'] = progress_tracker
 
                 # Step 1: Enhanced Validation
@@ -187,9 +187,9 @@ class EnhancedAnalysisManager:
 
                 # Call enhanced SEO engine
                 result = seo_engine.analyze_website(
-                    website_url, 
-                    target_keyword, 
-                    max_pages, 
+                    website_url,
+                    target_keyword,
+                    max_pages,
                     whole_website=whole_website
                 )
 
@@ -245,7 +245,6 @@ class EnhancedAnalysisManager:
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"❌ Enhanced analysis {analysis_id} failed: {error_msg}")
-
                 with analyses_lock:
                     if analysis_id in analyses:
                         analyses[analysis_id].update({
@@ -333,7 +332,7 @@ def start_analysis_endpoint():
             'serp_analysis': serp_analysis,
             'use_cache': use_cache,
             'status': 'queued',
-            'progress': 'Enhanced analysis queued for processing...',
+            'progress': 'Enhanced analysis queued for processing',
             'started_at': datetime.now().isoformat(),
             'user_agent': request.headers.get('User-Agent', ''),
             'client_ip': request.remote_addr,
@@ -343,6 +342,7 @@ def start_analysis_endpoint():
 
         with analyses_lock:
             analyses[analysis_id] = initial_record
+
         time.sleep(0.1)  # Ensure record creation
 
         # Start enhanced analysis
@@ -411,7 +411,7 @@ def check_status(analysis_id):
         # Don't return full report in status (too large)
         if 'report' in analysis:
             analysis['has_report'] = True
-            preview = analysis['report'][:300] + '...' if len(analysis['report']) > 300 else analysis['report']
+            preview = analysis['report'][:300] + '(truncated)' if len(analysis['report']) > 300 else analysis['report']
             analysis['report_preview'] = preview
             del analysis['report']
 
@@ -566,7 +566,7 @@ def get_cache_statistics():
 
             # Recent cache activity
             cursor.execute("""
-                SELECT COUNT(*) FROM page_cache 
+                SELECT COUNT(*) FROM page_cache
                 WHERE datetime(last_accessed) > datetime('now', '-24 hours')
             """)
             recent_access = cursor.fetchone()[0]
@@ -575,15 +575,15 @@ def get_cache_statistics():
             cursor.execute("SELECT AVG(analysis_count) FROM page_cache")
             avg_reuse = cursor.fetchone()[0] or 0
 
-        return jsonify({
-            'cache_statistics': {
-                'total_cached_pages': total_cached,
-                'recent_access_24h': recent_access,
-                'average_reuse_count': round(avg_reuse, 2),
-                'top_domains': [{'domain': domain, 'pages': count} for domain, count in cache_by_domain],
-                'cache_efficiency': round((recent_access / max(total_cached, 1)) * 100, 1)
-            }
-        })
+            return jsonify({
+                'cache_statistics': {
+                    'total_cached_pages': total_cached,
+                    'recent_access_24h': recent_access,
+                    'average_reuse_count': round(avg_reuse, 2),
+                    'top_domains': [{'domain': domain, 'pages': count} for domain, count in cache_by_domain],
+                    'cache_efficiency': round((recent_access / max(total_cached, 1)) * 100, 1)
+                }
+            })
 
     except Exception as e:
         logger.error(f"Error getting cache statistics: {e}")
@@ -635,11 +635,11 @@ if __name__ == '__main__':
     # For local development only
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
-    
+
     logger.info(f"🚀 Starting Enhanced SEO Audit Tool V3.0 on port {port}")
     logger.info(f"🔧 Debug mode: {debug}")
     logger.info(f"📊 Enhanced features: SERP analysis, Smart caching, Whole website analysis")
-    
+
     app.run(host='0.0.0.0', port=port, debug=debug)
 
 # For gunicorn (production)
