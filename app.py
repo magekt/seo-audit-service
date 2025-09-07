@@ -25,6 +25,13 @@ from seo_engine import EnhancedSEOEngine, CacheManager
 from config import Config
 import utils
 
+# Enhanced logging configuration
+os.makedirs('logs', exist_ok=True) # CREATE LOGS DIRECTORY FIRST
+os.makedirs('reports', exist_ok=True)
+os.makedirs('exports', exist_ok=True)
+os.makedirs('cache', exist_ok=True)
+os.makedirs('static/img', exist_ok=True)
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -32,12 +39,11 @@ app.config.from_object(Config)
 # Enable CORS
 CORS(app, origins=["*"])
 
-# Enhanced logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('logs/app.log'),
+        logging.FileHandler('logs/app.log'),  # NOW THIS WILL WORK
         logging.StreamHandler()
     ]
 )
