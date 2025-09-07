@@ -224,19 +224,19 @@ def clean_html_text(text: str) -> str:
     """Clean and normalize HTML text content"""
     if not text:
         return ""
-
+        
     # Remove extra whitespace
-    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'\s+', ' ', text)  # Already correct with 'r'
     text = text.strip()
-
+    
     # Remove non-printable characters
-    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
-
+    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)  # Already correct with 'r'
+    
     return text
 
 def extract_numbers(text: str) -> list:
     """Extract all numbers from text"""
-    return [float(match) for match in re.findall(r'\d+\.?\d*', text)]
+    return [float(match) for match in re.findall(r'\d+\.?\d*', text)]  # Already correct with 'r'
 
 def is_mobile_user_agent(user_agent: str) -> bool:
     """Check if user agent is mobile"""
