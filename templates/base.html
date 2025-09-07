@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Enhanced SEO Audit Tool V3.0{% endblock %}</title>
+
+    <!-- Enhanced Meta Tags -->
+    <meta name="description" content="Professional SEO audit tool with advanced crawling, SERP analysis, and comprehensive reporting capabilities">
+    <meta name="keywords" content="SEO audit, website analysis, SERP analysis, SEO tool, website optimization">
+    <meta name="author" content="Enhanced SEO Audit Tool">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="{% block og_title %}Enhanced SEO Audit Tool V3.0{% endblock %}">
+    <meta property="og:description" content="Professional SEO analysis with advanced features">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.url }}">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/enhanced-styles.css') }}" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+</head>
+<body>
+    <!-- Enhanced Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
+                <i class="fas fa-search-plus me-2"></i>
+                Enhanced SEO Audit Tool
+                <span class="badge bg-light text-primary ms-2">V3.0</span>
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home me-1"></i>Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/api/health" target="_blank">
+                            <i class="fas fa-heartbeat me-1"></i>Health
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cog me-1"></i>Advanced
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/api/admin/cache-stats" target="_blank">
+                                <i class="fas fa-database me-2"></i>Cache Stats
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="clearCache()">
+                                <i class="fas fa-trash me-2"></i>Clear Cache
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Enhanced Footer -->
+    <footer class="footer bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-8">
+                    <h6 class="mb-3">
+                        <i class="fas fa-rocket me-2"></i>
+                        Enhanced SEO Audit Tool V3.0
+                    </h6>
+                    <p class="mb-2">Professional website analysis with advanced crawling capabilities</p>
+                    <div class="feature-list">
+                        <span class="badge bg-primary me-2">
+                            <i class="fas fa-globe me-1"></i>Whole Website Analysis
+                        </span>
+                        <span class="badge bg-success me-2">
+                            <i class="fas fa-chart-line me-1"></i>SERP Competition
+                        </span>
+                        <span class="badge bg-info me-2">
+                            <i class="fas fa-rocket me-1"></i>Smart Caching
+                        </span>
+                        <span class="badge bg-warning me-2">
+                            <i class="fas fa-file-csv me-1"></i>CSV Export
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <h6 class="mb-3">System Status</h6>
+                    <div class="status-indicator">
+                        <span class="badge bg-success">
+                            <i class="fas fa-check-circle me-1"></i>
+                            Online
+                        </span>
+                    </div>
+                    <p class="small mt-2 mb-0">
+                        © 2025 Enhanced SEO Audit Tool<br>
+                        Built for professional SEO analysis
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/enhanced-app.js') }}"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,135 @@
+# Enhanced SEO Audit Tool V3.0 - Render Deployment Configuration
+
+services:
+  - type: web
+    name: seo-audit-tool-v3-enhanced
+    env: python
+    plan: starter  # Can be upgraded to standard/pro for production
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      mkdir -p logs reports exports cache static/img
+    startCommand: |
+      python run.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        sync: false
+        value: 5000
+      - key: HOST
+        value: 0.0.0.0
+
+      # Enhanced SEO Engine Configuration
+      - key: MAX_CONCURRENT_REQUESTS
+        value: 3
+      - key: REQUEST_TIMEOUT  
+        value: 30
+      - key: REQUEST_DELAY
+        value: 1.5
+      - key: MAX_PAGES_LIMIT
+        value: 25
+
+      # Caching Configuration
+      - key: CACHE_ENABLED
+        value: true
+      - key: CACHE_MAX_AGE_HOURS
+        value: 24
+      - key: CACHE_CLEANUP_DAYS
+        value: 7
+
+      # SERP Analysis Configuration
+      - key: SERP_ANALYSIS_ENABLED
+        value: true
+      - key: SERP_MAX_RESULTS
+        value: 10
+
+      # Rate Limiting for Production
+      - key: RATE_LIMIT_REQUESTS
+        value: 5
+      - key: RATE_LIMIT_WINDOW
+        value: 60
+
+      # Enhanced Features
+      - key: WHOLE_WEBSITE_MAX_PAGES
+        value: 500
+      - key: ENHANCED_REPORTING
+        value: true
+      - key: CSV_EXPORT_ENABLED
+        value: true
+
+      # Performance Optimization
+      - key: CONNECTION_POOL_SIZE
+        value: 10
+      - key: CONNECTION_TIMEOUT
+        value: 10
+      - key: READ_TIMEOUT
+        value: 25
+
+      # Security
+      - key: VERIFY_SSL
+        value: true
+
+      # Logging
+      - key: LOG_LEVEL
+        value: INFO
+
+# Database Configuration (Optional - for future use)
+databases:
+  - name: seo-cache-db
+    databaseName: seo_cache
+    user: seo_user
+    plan: starter  # Free tier database
+
+# Environment Groups (Optional)
+envVarGroups:
+  - name: seo-audit-production
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: MAX_CONCURRENT_REQUESTS
+        value: 3
+      - key: RATE_LIMIT_REQUESTS
+        value: 5
+      - key: CACHE_ENABLED
+        value: true
+      - key: SERP_ANALYSIS_ENABLED
+        value: true
+
+# Disk Configuration for persistent storage
+disks:
+  - name: seo-data
+    mountPath: /opt/render/project/src/data
+    sizeGB: 1  # 1GB free storage for cache and reports
+
+# Health Check Configuration
+healthCheckPath: /api/health
+
+# Scaling Configuration
+scaling:
+  minInstances: 1
+  maxInstances: 3
+  targetCPUPercent: 70
+  targetMemoryPercent: 80
+
+# Build Configuration
+build:
+  commands:
+    - echo "🚀 Building Enhanced SEO Audit Tool V3.0..."
+    - pip install --no-cache-dir -r requirements.txt
+    - python -c "import seo_engine; print('✅ SEO Engine imported successfully')"
+    - echo "✅ Build completed successfully!"
+
+# Deploy Configuration
+deploy:
+  branch: version3
+  autoSync: true
+
+# Preview Configuration
+previews:
+  buildCommand: |
+    pip install -r requirements.txt
+    mkdir -p logs reports exports cache
+  startCommand: python run.py

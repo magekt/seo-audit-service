@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Enhanced SEO Audit Tool - Professional Website Analysis{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Enhanced Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="hero-section bg-gradient-primary text-white p-5 rounded">
+                <h1 class="display-4 fw-bold mb-3">🔍 Enhanced SEO Audit Tool</h1>
+                <p class="lead mb-4">Comprehensive website analysis with advanced crawling, SERP analysis, and intelligent caching</p>
+
+                <!-- New Feature Highlights -->
+                <div class="row text-center mt-4">
+                    <div class="col-md-3">
+                        <div class="feature-highlight">
+                            <i class="fas fa-globe fa-2x mb-2"></i>
+                            <h6>Whole Website Analysis</h6>
+                            <small>Deep crawl every discoverable link</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="feature-highlight">
+                            <i class="fas fa-chart-line fa-2x mb-2"></i>
+                            <h6>SERP Competition</h6>
+                            <small>Analyze top 10 competitors</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="feature-highlight">
+                            <i class="fas fa-rocket fa-2x mb-2"></i>
+                            <h6>Smart Caching</h6>
+                            <small>Resume & incremental analysis</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="feature-highlight">
+                            <i class="fas fa-file-csv fa-2x mb-2"></i>
+                            <h6>Comprehensive Export</h6>
+                            <small>Detailed CSV reports</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Analysis Form -->
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-white py-4">
+                    <h3 class="card-title mb-0">🎯 Start Enhanced SEO Analysis</h3>
+                    <p class="text-muted mb-0">Enter your website details below for comprehensive analysis</p>
+                </div>
+
+                <div class="card-body p-4">
+                    <form id="analysis-form" novalidate>
+                        <!-- Website URL -->
+                        <div class="mb-4">
+                            <label for="website_url" class="form-label fw-semibold">
+                                <i class="fas fa-link text-primary me-2"></i>Website URL
+                            </label>
+                            <input type="url" 
+                                   class="form-control form-control-lg" 
+                                   id="website_url" 
+                                   name="website_url" 
+                                   placeholder="https://example.com" 
+                                   required>
+                            <div class="form-text">Include https:// or http:// in your URL</div>
+                            <div class="invalid-feedback">Please enter a valid website URL</div>
+                        </div>
+
+                        <!-- Target Keyword -->
+                        <div class="mb-4">
+                            <label for="target_keyword" class="form-label fw-semibold">
+                                <i class="fas fa-key text-primary me-2"></i>Target Keyword
+                            </label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="target_keyword" 
+                                   name="target_keyword" 
+                                   placeholder="digital marketing" 
+                                   required>
+                            <div class="form-text">Main keyword you want to rank for</div>
+                            <div class="invalid-feedback">Please enter a target keyword</div>
+                        </div>
+
+                        <!-- Analysis Type Selection -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">
+                                <i class="fas fa-cogs text-primary me-2"></i>Analysis Type
+                            </label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card border-2 analysis-type-card" data-type="selective">
+                                        <div class="card-body text-center p-3">
+                                            <i class="fas fa-list-ol fa-2x text-primary mb-2"></i>
+                                            <h6 class="card-title">Selective Analysis</h6>
+                                            <p class="card-text small text-muted">Analyze specific number of pages</p>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="analysis_type" id="selective" value="selective" checked>
+                                                <label class="form-check-label fw-semibold" for="selective">Quick Analysis</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card border-2 analysis-type-card" data-type="whole">
+                                        <div class="card-body text-center p-3">
+                                            <i class="fas fa-globe fa-2x text-warning mb-2"></i>
+                                            <h6 class="card-title">Whole Website</h6>
+                                            <p class="card-text small text-muted">Comprehensive site-wide analysis</p>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="analysis_type" id="whole_website" value="whole">
+                                                <label class="form-check-label fw-semibold" for="whole_website">Deep Analysis</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Max Pages (for selective analysis) -->
+                        <div class="mb-4" id="max-pages-section">
+                            <label for="max_pages" class="form-label fw-semibold">
+                                <i class="fas fa-hashtag text-primary me-2"></i>Maximum Pages to Analyze
+                            </label>
+                            <select class="form-select form-select-lg" id="max_pages" name="max_pages">
+                                <option value="5">5 pages (Quick)</option>
+                                <option value="10" selected>10 pages (Standard)</option>
+                                <option value="25">25 pages (Comprehensive)</option>
+                                <option value="50">50 pages (Enterprise)</option>
+                            </select>
+                            <div class="form-text">More pages = more detailed analysis but longer processing time</div>
+                        </div>
+
+                        <!-- Whole Website Warning -->
+                        <div class="alert alert-warning" id="whole-website-warning" style="display: none;">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-exclamation-triangle fa-lg text-warning me-3 mt-1"></i>
+                                <div>
+                                    <h6 class="alert-heading mb-2">⚠️ Comprehensive Analysis Warning</h6>
+                                    <p class="mb-2">This comprehensive analysis will take significantly more time as the system will:</p>
+                                    <ul class="mb-2">
+                                        <li>Discover and analyze <strong>every link</strong> associated with your domain</li>
+                                        <li>Check sitemaps and robots.txt for additional pages</li>
+                                        <li>Perform deep technical SEO analysis on all found pages</li>
+                                        <li>Generate comprehensive multi-page reports</li>
+                                    </ul>
+                                    <p class="mb-0"><strong>Estimated time:</strong> 5-30 minutes depending on website size</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Options -->
+                        <div class="mb-4">
+                            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options">
+                                <i class="fas fa-cog me-1"></i>Advanced Options
+                            </button>
+
+                            <div class="collapse mt-3" id="advanced-options">
+                                <div class="card card-body bg-light">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="serp_analysis" name="serp_analysis" checked>
+                                                <label class="form-check-label" for="serp_analysis">
+                                                    <strong>SERP Competition Analysis</strong>
+                                                    <div class="text-muted small">Analyze top 10 competitors</div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="use_cache" name="use_cache" checked>
+                                                <label class="form-check-label" for="use_cache">
+                                                    <strong>Smart Caching</strong>
+                                                    <div class="text-muted small">Use cached data when available</div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="start-analysis">
+                                <i class="fas fa-search me-2"></i>
+                                <span class="btn-text">Start Enhanced SEO Analysis</span>
+                                <span class="spinner-border spinner-border-sm ms-2" role="status" style="display: none;"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Progress Section -->
+    <div class="row mt-4" id="progress-container" style="display: none;">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow border-0">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        Analysis in Progress
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Progress Bar -->
+                    <div class="mb-3">
+                        <div class="progress progress-lg">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 id="progress" 
+                                 role="progressbar" 
+                                 style="width: 0%">
+                                <span class="progress-text">0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Details -->
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="progress-stat">
+                                <div class="stat-value" id="pages-analyzed">0</div>
+                                <div class="stat-label">Pages Analyzed</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="progress-stat">
+                                <div class="stat-value" id="issues-found">0</div>
+                                <div class="stat-label">Issues Found</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="progress-stat">
+                                <div class="stat-value" id="cache-hits">0</div>
+                                <div class="stat-label">Cache Hits</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="progress-stat">
+                                <div class="stat-value" id="elapsed-time">0s</div>
+                                <div class="stat-label">Elapsed Time</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Text -->
+                    <div class="mt-3">
+                        <div class="alert alert-info mb-0">
+                            <div id="progress-text">Initializing analysis...</div>
+                            <div class="mt-2">
+                                <small class="text-muted" id="progress-details">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Enhanced crawling with caching and SERP analysis enabled
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Results Section -->
+    <div class="row mt-4" id="results-container" style="display: none;">
+        <div class="col-12">
+            <div class="card shadow border-0">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Enhanced SEO Analysis Complete
+                    </h5>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-light btn-sm" onclick="downloadReport()">
+                            <i class="fas fa-download me-1"></i>Download Report
+                        </button>
+                        <button type="button" class="btn btn-light btn-sm" onclick="downloadCSV()">
+                            <i class="fas fa-file-csv me-1"></i>Download CSV
+                        </button>
+                        <button type="button" class="btn btn-outline-light btn-sm" onclick="startNewAnalysis()">
+                            <i class="fas fa-redo me-1"></i>New Analysis
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="results-content" class="p-4">
+                        <!-- Results will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
