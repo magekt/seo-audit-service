@@ -170,12 +170,23 @@ async function startEnhancedAnalysis(data) {
             body: JSON.stringify(data)
         });
 
-        const result = await response.json();
-
         if (!response.ok) {
-            throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
+            // Handle different error types
+            if (response.status === 502) {
+                throw new Error('Server is temporarily unavailable. Please try again in a few minutes.');
+            }
+            
+            let errorMessage;
+            try {
+                const result = await response.json();
+                errorMessage = result.error || `HTTP ${response.status}: ${response.statusText}`;
+            } catch (e) {
+                errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
         }
 
+        const result = await response.json();
         currentAnalysisId = result.analysis_id;
         console.log(`✅ Enhanced analysis started: ${currentAnalysisId}`);
 
@@ -279,166 +290,221 @@ function updateEnhancedStats(metadata, enhancedSummary) {
     if (metadata.elapsed_seconds || metadata.elapsed_formatted) {
         const timeElement = document.getElementById('elapsed-time');
         if (timeElement) {
-            timeElement.textContent = metadata.elapsed_formatted || formatDuration(metadata.elapsed_seconds);
+            timeElement.textContent = metadata.elapsed_formatted || formatDuration(metadata.elapsed_seconds || 0);
         }
     }
 }
 
 async function loadEnhancedResults() {
-    if (!currentAnalysisId) return;
+    console.log('📊 Loading enhanced results...');
+    
+    if (!currentAnalysisId) {
+        console.error('No analysis ID available');
+        return;
+    }
 
     try {
+        // Show results section
+        updateUI('completed');
+        
+        // Fetch the report
         const response = await fetch(`${CONFIG.endpoints.report}/${currentAnalysisId}`);
-        const result = await response.json();
-
+        
         if (!response.ok) {
-            throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(`Failed to load results: ${response.status}`);
         }
-
-        displayEnhancedResults(result);
-
+        
+        const data = await response.json();
+        
+        // Display the report
+        displayEnhancedReport(data);
+        
+        // Scroll to results
+        const resultsSection = document.getElementById('results-section');
+        if (resultsSection) {
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
     } catch (error) {
-        console.error('❌ Failed to load enhanced results:', error);
-        showError('Failed to load enhanced results: ' + error.message);
+        console.error('❌ Error loading results:', error);
+        showError('Failed to load results: ' + error.message);
     }
 }
 
-function displayEnhancedResults(data) {
-    const report = data.report || '';
+function displayEnhancedReport(data) {
+    console.log('📋 Displaying enhanced report...', data);
+    
+    // Update report content
+    const reportContent = document.getElementById('report-content');
+    if (reportContent && data.report) {
+        // Convert markdown to HTML (simple conversion)
+        const htmlReport = convertMarkdownToHTML(data.report);
+        reportContent.innerHTML = htmlReport;
+    }
+    
+    // Update metadata
     const metadata = data.metadata || {};
-    const enhancedFeatures = data.enhanced_features || {};
-
-    // Enhanced HTML conversion with better styling
-    const html = markdownToHtml(report);
-
-    const resultsContainer = document.getElementById('results-container');
-    const resultsContent = document.getElementById('results-content');
-
-    if (resultsContent) {
-        resultsContent.innerHTML = `
-            <div class="enhanced-results fade-in">
-                <!-- Enhanced metadata display -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="stat-card text-center p-3 bg-primary text-white rounded">
-                            <div class="stat-value">${metadata.seo_score || 0}/100</div>
-                            <div class="stat-label">SEO Score</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card text-center p-3 bg-info text-white rounded">
-                            <div class="stat-value">${metadata.pages_analyzed || 0}</div>
-                            <div class="stat-label">Pages Analyzed</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card text-center p-3 bg-warning text-white rounded">
-                            <div class="stat-value">${metadata.issues_found || 0}</div>
-                            <div class="stat-label">Issues Found</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card text-center p-3 bg-success text-white rounded">
-                            <div class="stat-value">${metadata.cached_pages || 0}</div>
-                            <div class="stat-label">Cache Hits</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Enhanced features summary -->
-                ${enhancedFeatures.whole_website_analysis ? `
-                    <div class="alert alert-info mb-4">
-                        <h6 class="alert-heading"><i class="fas fa-globe me-2"></i>Whole Website Analysis</h6>
-                        <p class="mb-0">Comprehensive analysis completed with ${enhancedFeatures.pages_from_cache || 0} pages loaded from cache.</p>
-                    </div>
-                ` : ''}
-
-                <!-- Enhanced report content -->
-                <div class="report-content">
-                    ${html}
-                </div>
-            </div>
-        `;
+    const enhanced = data.enhanced_features || {};
+    
+    // Update SEO score
+    const seoScore = metadata.seo_score || 0;
+    updateSEOScoreDisplay(seoScore);
+    
+    // Update statistics
+    updateFinalStats(metadata, enhanced);
+    
+    // Show download button if CSV is available
+    const downloadBtn = document.getElementById('download-csv-btn');
+    if (downloadBtn && data.enhanced_features?.has_csv_export) {
+        downloadBtn.style.display = 'inline-block';
+        downloadBtn.onclick = () => downloadCSV(currentAnalysisId);
     }
-
-    if (resultsContainer) {
-        resultsContainer.style.display = 'block';
-        resultsContainer.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    updateUI('completed');
+    
+    // Update analysis info
+    updateAnalysisInfo(data);
 }
 
-// Enhanced utility functions
-function showProgress(message, percentage) {
-    const progressBar = document.getElementById('progress');
-    const progressText = document.getElementById('progress-text');
+function convertMarkdownToHTML(markdown) {
+    return markdown
+        // Headers
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        // Bold and italic
+        .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+        .replace(/\*(.*)\*/gim, '<em>$1</em>')
+        // Lists
+        .replace(/^\- (.*$)/gim, '<li>$1</li>')
+        // Line breaks
+        .replace(/\n$/gim, '<br>')
+        // Tables (basic)
+        .replace(/\|/g, '</td><td>')
+        .replace(/^(.*\|.*)/gim, '<tr><td>$1</td></tr>')
+        // Wrap table rows
+        .replace(/(<tr>.*<\/tr>)/gim, '<table class="table table-striped">$1</table>');
+}
 
-    if (progressBar) {
-        progressBar.style.width = `${percentage}%`;
-        progressBar.setAttribute('aria-valuenow', percentage);
-
-        const progressSpan = progressBar.querySelector('.progress-text');
-        if (progressSpan) {
-            progressSpan.textContent = `${percentage.toFixed(1)}%`;
-        }
+function updateSEOScoreDisplay(score) {
+    const scoreElement = document.getElementById('seo-score');
+    const scoreBar = document.getElementById('seo-score-bar');
+    const scoreText = document.getElementById('seo-score-text');
+    
+    if (scoreElement) {
+        animateValue(scoreElement, 0, score, 1000);
     }
+    
+    if (scoreBar) {
+        scoreBar.style.width = score + '%';
+        scoreBar.className = `progress-bar ${getScoreColor(score)}`;
+    }
+    
+    if (scoreText) {
+        scoreText.textContent = getScoreDescription(score);
+        scoreText.className = `badge ${getScoreColor(score).replace('bg-', 'bg-')}`;
+    }
+}
 
+function getScoreColor(score) {
+    if (score >= 80) return 'bg-success';
+    if (score >= 60) return 'bg-warning';
+    return 'bg-danger';
+}
+
+function getScoreDescription(score) {
+    if (score >= 80) return 'Excellent';
+    if (score >= 60) return 'Good';
+    if (score >= 40) return 'Needs Work';
+    return 'Poor';
+}
+
+function updateFinalStats(metadata, enhanced) {
+    const stats = {
+        'final-pages': metadata.pages_analyzed || 0,
+        'final-issues': metadata.issues_found || 0,
+        'final-duration': formatDuration(metadata.crawl_duration || 0),
+        'final-cache': metadata.cached_pages || 0
+    };
+    
+    Object.entries(stats).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            if (typeof value === 'number') {
+                animateValue(element, 0, value, 800);
+            } else {
+                element.textContent = value;
+            }
+        }
+    });
+}
+
+function updateAnalysisInfo(data) {
+    const infoElement = document.getElementById('analysis-info');
+    if (infoElement && data.metadata) {
+        const info = [
+            `Analysis Type: ${data.metadata.whole_website_analysis ? 'Whole Website' : 'Selective Pages'}`,
+            `SERP Analysis: ${data.metadata.serp_results_count > 0 ? 'Enabled' : 'Disabled'}`,
+            `Caching: ${data.metadata.cached_pages > 0 ? 'Used' : 'Not Used'}`,
+            `Generated: ${new Date().toLocaleString()}`
+        ];
+        infoElement.innerHTML = info.map(i => `<small class="text-muted d-block">${i}</small>`).join('');
+    }
+}
+
+// Utility functions
+function updateUI(state) {
+    const elements = {
+        form: document.getElementById('analysis-form'),
+        progress: document.getElementById('progress-section'),
+        results: document.getElementById('results-section'),
+        startBtn: document.getElementById('start-analysis')
+    };
+
+    switch (state) {
+        case 'idle':
+            if (elements.form) elements.form.style.display = 'block';
+            if (elements.progress) elements.progress.style.display = 'none';
+            if (elements.results) elements.results.style.display = 'none';
+            if (elements.startBtn) {
+                elements.startBtn.disabled = false;
+                elements.startBtn.innerHTML = '<i class="fas fa-search me-2"></i>Start Enhanced Analysis';
+            }
+            break;
+        case 'starting':
+        case 'running':
+            if (elements.form) elements.form.style.display = 'none';
+            if (elements.progress) elements.progress.style.display = 'block';
+            if (elements.results) elements.results.style.display = 'none';
+            if (elements.startBtn) {
+                elements.startBtn.disabled = true;
+                elements.startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
+            }
+            break;
+        case 'completed':
+            if (elements.form) elements.form.style.display = 'none';
+            if (elements.progress) elements.progress.style.display = 'none';
+            if (elements.results) elements.results.style.display = 'block';
+            break;
+    }
+}
+
+function showProgress(message, percentage) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    
+    if (progressBar) {
+        progressBar.style.width = percentage + '%';
+        progressBar.setAttribute('aria-valuenow', percentage);
+    }
+    
     if (progressText) {
         progressText.textContent = message;
     }
 }
 
 function updateProgressDetails(details) {
-    const progressDetails = document.getElementById('progress-details');
-    if (progressDetails) {
-        progressDetails.innerHTML = `<i class="fas fa-info-circle me-1"></i>${details}`;
-    }
-}
-
-function updateUI(state) {
-    const button = document.getElementById('start-analysis');
-    const spinner = button?.querySelector('.spinner-border');
-    const buttonText = button?.querySelector('.btn-text');
-    const progressContainer = document.getElementById('progress-container');
-    const resultsContainer = document.getElementById('results-container');
-
-    switch (state) {
-        case 'starting':
-            if (button) {
-                button.disabled = true;
-                if (spinner) spinner.style.display = 'inline-block';
-                if (buttonText) buttonText.textContent = 'Starting Analysis...';
-            }
-            if (progressContainer) progressContainer.style.display = 'block';
-            if (resultsContainer) resultsContainer.style.display = 'none';
-            break;
-
-        case 'running':
-            if (button) {
-                button.disabled = true;
-                if (buttonText) buttonText.textContent = 'Analysis Running...';
-            }
-            break;
-
-        case 'completed':
-            if (button) {
-                button.disabled = false;
-                if (spinner) spinner.style.display = 'none';
-                if (buttonText) buttonText.textContent = 'Start Enhanced SEO Analysis';
-            }
-            if (progressContainer) progressContainer.style.display = 'none';
-            break;
-
-        case 'idle':
-        default:
-            if (button) {
-                button.disabled = false;
-                if (spinner) spinner.style.display = 'none';
-                if (buttonText) buttonText.textContent = 'Start Enhanced SEO Analysis';
-            }
-            if (progressContainer) progressContainer.style.display = 'none';
-            break;
+    const detailsElement = document.getElementById('progress-details');
+    if (detailsElement) {
+        detailsElement.textContent = details;
     }
 }
 
@@ -449,204 +515,152 @@ function stopProgressPolling() {
     }
 }
 
-function downloadCSV() {
-    if (currentAnalysisId) {
-        const downloadUrl = `${CONFIG.endpoints.downloadCsv}/${currentAnalysisId}`;
-        window.open(downloadUrl, '_blank');
-    } else {
-        showError('No analysis data available for download');
+function handleProgressError(error) {
+    statusCheckRetries++;
+    if (statusCheckRetries >= MAX_STATUS_RETRIES) {
+        stopProgressPolling();
+        showError('Analysis status check failed after multiple retries. Please refresh the page and try again.');
+        updateUI('idle');
     }
 }
 
-function downloadReport() {
-    if (currentAnalysisId) {
-        const reportContent = document.querySelector('.report-content');
-        if (reportContent) {
-            downloadAsFile(reportContent.innerText, `seo-audit-report-${currentAnalysisId}.txt`, 'text/plain');
+function showError(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+    alertDiv.innerHTML = `
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.container');
+    if (container) {
+        container.insertBefore(alertDiv, container.firstChild);
+    }
+}
+
+function showFieldError(fieldName, message) {
+    const field = document.getElementById(fieldName);
+    if (field) {
+        field.classList.add('is-invalid');
+        
+        let feedback = field.parentElement.querySelector('.invalid-feedback');
+        if (!feedback) {
+            feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            field.parentElement.appendChild(feedback);
         }
+        feedback.textContent = message;
     }
 }
 
-function startNewAnalysis() {
-    // Reset form and UI
-    currentAnalysisId = null;
-    stopProgressPolling();
-    updateUI('idle');
-
-    const form = document.getElementById('analysis-form');
-    if (form) {
-        form.reset();
-        form.classList.remove('was-validated');
+function clearFieldError(event) {
+    const field = event.target;
+    field.classList.remove('is-invalid');
+    
+    const feedback = field.parentElement.querySelector('.invalid-feedback');
+    if (feedback) {
+        feedback.remove();
     }
-
-    const resultsContainer = document.getElementById('results-container');
-    if (resultsContainer) {
-        resultsContainer.style.display = 'none';
-    }
-
-    // Scroll to form
-    const formCard = document.querySelector('.card');
-    if (formCard) {
-        formCard.scrollIntoView({ behavior: 'smooth' });
-    }
-}
-
-// Enhanced validation functions
-function validateUrl(url) {
-    const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
-    return urlPattern.test(url);
-}
-
-function validateKeyword(keyword) {
-    return keyword && keyword.trim().length >= 2 && keyword.trim().length <= 100;
 }
 
 function validateField(event) {
     const field = event.target;
     const value = field.value.trim();
-
-    if (field.hasAttribute('required') && !value) {
-        showFieldError(field.id, 'This field is required');
-        return false;
-    }
-
-    if (field.type === 'url' && value && !validateUrl(value)) {
-        showFieldError(field.id, 'Please enter a valid URL');
-        return false;
-    }
-
-    if (field.name === 'target_keyword' && value && !validateKeyword(value)) {
-        showFieldError(field.id, 'Please enter a valid keyword (2-100 characters)');
-        return false;
-    }
-
-    clearFieldError(field.id);
-    return true;
-}
-
-function showFieldError(fieldId, message) {
-    const field = document.getElementById(fieldId);
-    if (field) {
-        field.classList.add('is-invalid');
-
-        let feedback = field.parentNode.querySelector('.invalid-feedback');
-        if (feedback) {
-            feedback.textContent = message;
-        }
+    
+    if (field.id === 'website_url' && !validateUrl(value)) {
+        showFieldError(field.id, 'Please enter a valid website URL');
+    } else if (field.id === 'target_keyword' && !validateKeyword(value)) {
+        showFieldError(field.id, 'Please enter a valid target keyword');
     }
 }
 
-function clearFieldError(event) {
-    const field = event.target || event;
-    if (field.classList) {
-        field.classList.remove('is-invalid');
+function validateUrl(url) {
+    try {
+        new URL(url.startsWith('http') ? url : 'https://' + url);
+        return true;
+    } catch {
+        return false;
     }
 }
 
-// Enhanced utility functions
-function formatDuration(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+function validateKeyword(keyword) {
+    return keyword.length >= 2 && keyword.length <= 100;
 }
 
 function animateValue(element, start, end, duration) {
-    const range = end - start;
-    const increment = range / (duration / 16);
-    let current = start;
-
-    const timer = setInterval(() => {
-        current += increment;
-        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-            current = end;
-            clearInterval(timer);
-        }
+    const startTimestamp = performance.now();
+    const step = (timestamp) => {
+        const elapsed = timestamp - startTimestamp;
+        const progress = Math.min(elapsed / duration, 1);
+        const current = start + (end - start) * progress;
+        
         element.textContent = Math.floor(current);
-    }, 16);
-}
-
-function downloadAsFile(content, filename, contentType) {
-    const blob = new Blob([content], { type: contentType });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-}
-
-function markdownToHtml(markdown) {
-    // Enhanced markdown to HTML conversion
-    let html = markdown
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
-        .replace(/^##### (.*$)/gim, '<h5>$1</h5>')
-        .replace(/^###### (.*$)/gim, '<h6>$1</h6>')
-        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-        .replace(/\`(.*?)\`/gim, '<code>$1</code>')
-        .replace(/^\* (.*$)/gim, '<li>$1</li>')
-        .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
-        .replace(/^\| (.*) \|$/gim, '<tr><td>$1</td></tr>')
-        .replace(/\n/g, '<br>');
-
-    // Wrap lists
-    html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
-
-    // Simple table conversion
-    html = html.replace(/\|(.+?)\|/g, (match, content) => {
-        const cells = content.split('|').map(cell => `<td>${cell.trim()}</td>`).join('');
-        return `<tr>${cells}</tr>`;
-    });
-
-    // Wrap tables
-    html = html.replace(/(<tr>.*<\/tr>)/gs, '<table class="table table-striped">$1</table>');
-
-    return html;
-}
-
-function showError(message) {
-    // Create enhanced error alert
-    const alertHtml = `
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            <strong>Error:</strong> ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
-
-    // Insert at top of form card
-    const formCard = document.querySelector('.card-body');
-    if (formCard) {
-        formCard.insertAdjacentHTML('afterbegin', alertHtml);
-
-        // Auto-remove after 10 seconds
-        setTimeout(() => {
-            const alert = formCard.querySelector('.alert-danger');
-            if (alert) {
-                alert.remove();
-            }
-        }, 10000);
-    }
-}
-
-// Enhanced error handling
-function handleProgressError(error) {
-    if (error.message.includes('404') || error.message.includes('Analysis not found')) {
-        statusCheckRetries++;
-        if (statusCheckRetries <= MAX_STATUS_RETRIES) {
-            showProgress(`Initializing enhanced analysis... (attempt ${statusCheckRetries}/${MAX_STATUS_RETRIES})`, Math.min(10, statusCheckRetries * 2));
-            return;
+        
+        if (progress < 1) {
+            requestAnimationFrame(step);
         }
-    }
+    };
+    requestAnimationFrame(step);
+}
 
+function formatDuration(seconds) {
+    if (seconds < 60) {
+        return `${seconds}s`;
+    } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}m ${remainingSeconds}s`;
+    } else {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return `${hours}h ${minutes}m`;
+    }
+}
+
+function startNewAnalysis() {
+    currentAnalysisId = null;
+    statusCheckRetries = 0;
     stopProgressPolling();
-    showError('Enhanced analysis error: ' + error.message);
     updateUI('idle');
+    
+    // Clear form
+    const form = document.getElementById('analysis-form');
+    if (form) {
+        form.reset();
+        form.classList.remove('was-validated');
+    }
+    
+    // Clear any error messages
+    document.querySelectorAll('.alert').forEach(alert => alert.remove());
+    document.querySelectorAll('.is-invalid').forEach(field => {
+        field.classList.remove('is-invalid');
+    });
+    document.querySelectorAll('.invalid-feedback').forEach(feedback => feedback.remove());
+}
+
+async function downloadCSV(analysisId) {
+    try {
+        const response = await fetch(`${CONFIG.endpoints.downloadCsv}/${analysisId}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to download CSV');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `seo-analysis-${analysisId}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+    } catch (error) {
+        console.error('❌ CSV download failed:', error);
+        showError('Failed to download CSV: ' + error.message);
+    }
 }
 
 // Admin functions
