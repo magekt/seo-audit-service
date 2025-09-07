@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}SEO Audit Tool - Professional Website Analysis{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-rocket me-2"></i>
+                    Start SEO Analysis
+                </h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    Comprehensive website auditing with advanced crawling, technical analysis, and actionable insights.
+                </p>
+
+                <form id="analysis-form" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="website_url" class="form-label">
+                            <i class="fas fa-globe me-1"></i>
+                            Website URL *
+                        </label>
+                        <input type="url" class="form-control" id="website_url" name="website_url" 
+                               placeholder="https://example.com" required>
+                        <div class="invalid-feedback">
+                            Please enter a valid website URL.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="target_keyword" class="form-label">
+                            <i class="fas fa-key me-1"></i>
+                            Target Keyword *
+                        </label>
+                        <input type="text" class="form-control" id="target_keyword" name="target_keyword" 
+                               placeholder="digital marketing" required>
+                        <div class="invalid-feedback">
+                            Please enter a target keyword.
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="max_pages" class="form-label">
+                            <i class="fas fa-file-alt me-1"></i>
+                            Max Pages to Analyze
+                        </label>
+                        <select class="form-select" id="max_pages" name="max_pages">
+                            <option value="5">5 pages (Quick)</option>
+                            <option value="10" selected>10 pages (Standard)</option>
+                            <option value="25">25 pages (Comprehensive)</option>
+                            <option value="50">50 pages (Deep Dive)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" id="start-analysis" class="btn btn-primary btn-lg w-100">
+                        <i class="fas fa-play me-2"></i>
+                        Start SEO Analysis
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Progress Container -->
+        <div id="progress-container" class="card mt-4" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cogs me-2"></i>
+                    Analysis in Progress
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3" style="height: 25px;">
+                    <div id="progress" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%">0%</div>
+                </div>
+                <p id="progress-text" class="text-muted mb-0">Initializing...</p>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div id="results-container" class="mt-4" style="display: none;">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    System Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="h4 text-primary">{{ system_status.total_analyses }}</div>
+                        <small class="text-muted">Total Analyses</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="h4 text-success">{{ system_status.active_analyses }}</div>
+                        <small class="text-muted">Active Now</small>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="small">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Environment:</span>
+                        <span class="badge bg-{{ 'success' if system_status.environment == 'production' else 'warning' }}">
+                            {{ system_status.environment|title }}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Version:</span>
+                        <span>{{ system_status.version }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Updated:</span>
+                        <span>{{ system_status.timestamp }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list-check me-2"></i>
+                    Analysis Features
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-code text-primary me-3"></i>
+                    <div>
+                        <div class="fw-bold">Technical SEO</div>
+                        <small class="text-muted">Meta tags, headers, SSL, mobile-friendly</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-file-text text-success me-3"></i>
+                    <div>
+                        <div class="fw-bold">Content Analysis</div>
+                        <small class="text-muted">Keyword density, readability, word count</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-tachometer-alt text-warning me-3"></i>
+                    <div>
+                        <div class="fw-bold">Performance</div>
+                        <small class="text-muted">Load times, Core Web Vitals, optimization</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-chart-line text-info me-3"></i>
+                    <div>
+                        <div class="fw-bold">SEO Score</div>
+                        <small class="text-muted">Overall health with recommendations</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

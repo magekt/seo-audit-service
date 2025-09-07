@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: seo-audit-tool-v2
+    runtime: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 180 app:app"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: APP_VERSION
+        value: "2.0.0"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PORT
+        value: 10000
+    healthCheckPath: "/api/health"
+    numInstances: 1
+    plan: free
+    region: oregon
+    scaling:
+      minInstances: 0
+      maxInstances: 1

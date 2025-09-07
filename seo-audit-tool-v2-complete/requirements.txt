@@ -1,0 +1,44 @@
+# SEO Audit Tool - Dependencies v2.0
+
+# Core framework and web server
+Flask==3.0.3
+Werkzeug==3.0.3
+gunicorn==22.0.0
+flask-cors==4.0.1
+
+# HTTP client libraries
+aiohttp==3.9.5
+requests==2.32.3
+urllib3==2.2.2
+
+# HTML parsing and web scraping
+beautifulsoup4==4.12.3
+lxml==5.2.2
+
+# Data manipulation and analysis
+pandas>=2.2.0
+numpy>=1.26.0
+openpyxl==3.1.5
+
+# Configuration management
+PyYAML==6.0.1
+python-dotenv==1.0.1
+
+# Date/time utilities
+python-dateutil==2.9.0
+
+# Progress bars and CLI utilities
+tqdm==4.66.4
+click==8.1.7
+
+# Validation and data processing
+validators==0.33.0
+
+# Async utilities
+asyncio-throttle==1.0.2
+
+# Production monitoring
+structlog==24.4.0
+
+# SSL certificates
+certifi==2024.8.30
