@@ -950,93 +950,104 @@ class EnhancedSEOCrawler:
 
         return issues
 
-    async def crawl_website_enhanced(self, start_url: str, target_keyword: str, max_pages: int = None, 
-                                   whole_website: bool = False) -> Tuple[List[SEOPageData], CrawlStats]:
-        """Enhanced crawling with caching and comprehensive analysis"""
-
+    async def crawl_website_enhanced(self, start_url: str, target_keyword: str, max_pages: int = None,
+                                    whole_website: bool = False) -> Tuple[List[SEOPageData], CrawlStats]:
+        """Enhanced crawling with proper pagination and caching"""
         logger.info(f"Starting enhanced crawl of {start_url} (whole_website: {whole_website})")
-
+        
         # Get cached URLs to avoid re-crawling
         domain = urlparse(start_url).netloc
         cached_urls = self.cache_manager.get_cached_urls_for_domain(domain)
-
+        
         if whole_website:
-            # Discover all URLs for the domain
+            # Discover all URLs for the domain - FIXED: Remove artificial limits
             urls_to_crawl = await self.discover_urls(start_url)
-            max_pages = len(urls_to_crawl) if max_pages is None else max_pages
+            # Don't limit discovered URLs for whole website analysis
+            logger.info(f"Discovered {len(urls_to_crawl)} URLs for whole website analysis")
         else:
+            # For selective analysis, start with the homepage and discover more
             urls_to_crawl = {start_url}
             max_pages = max_pages or 10
-
-        # Process URLs with caching
+    
+        # Convert to list for proper indexing and limiting
+        urls_list = list(urls_to_crawl)
+        
+        # Apply page limit for selective analysis
+        if not whole_website and max_pages:
+            urls_list = urls_list[:max_pages * 3]  # Get extra URLs for link discovery
+        
+        # Process URLs with caching - FIXED: Proper pagination logic
         semaphore = asyncio.Semaphore(self.config.max_concurrent_requests)
-
-        for url in list(urls_to_crawl)[:max_pages]:
+        crawled_count = 0
+        
+        # FIXED: Process URLs until we reach the limit
+        for i, url in enumerate(urls_list):
+            # Check if we've reached our page limit (for selective analysis)
+            if not whole_website and max_pages and crawled_count >= max_pages:
+                logger.info(f"Reached page limit of {max_pages} for selective analysis")
+                break
+                
             if url in self.crawled_urls:
                 continue
-
+                
             self.stats.total_pages += 1
-
+            
             # Check cache first
             cached_page = self.cache_manager.get_cached_page(url)
             if cached_page and url in cached_urls:
                 self.pages_data.append(cached_page)
                 self.stats.successful_pages += 1
                 self.stats.cached_pages += 1
+                crawled_count += 1
                 logger.info(f"Using cached data for: {url}")
                 continue
-
+    
             async with semaphore:
-                logger.info(f"Crawling ({len(self.pages_data)+1}/{max_pages}): {url}")
-
+                logger.info(f"Crawling ({crawled_count + 1}/{max_pages if not whole_website else 'ALL'}): {url}")
                 html, status_code, load_time, content_type = await self.fetch_page(url)
-
+                
                 if html and status_code == 200:
                     try:
                         # Enhanced SEO analysis
                         page_data = self.analyze_page_seo_enhanced(
                             url, html, target_keyword, status_code, load_time, content_type
                         )
-
-                        page_data.page_depth = len(self.pages_data)
+                        
+                        page_data.page_depth = crawled_count
                         self.pages_data.append(page_data)
                         self.stats.successful_pages += 1
                         self.stats.total_issues += len(page_data.seo_issues)
-
+                        crawled_count += 1
+                        
                         # Cache the page data
                         content_hash = hashlib.md5(html.encode()).hexdigest()
                         self.cache_manager.cache_page(page_data, content_hash)
-
-                        # Discover more URLs from this page (if not whole website mode)
-                        if not whole_website and len(self.pages_data) < max_pages:
+                        
+                        # FIXED: Discover more URLs from this page (for selective analysis)
+                        if not whole_website and crawled_count < max_pages:
                             soup = BeautifulSoup(html, 'html.parser')
-                            for link in soup.find_all('a', href=True)[:10]:  # Limit discovery
-                                href = link['href']
-                                if href.startswith('/'):
-                                    new_url = urljoin(start_url, href)
-                                elif href.startswith('http') and urlparse(href).netloc == domain:
-                                    new_url = href
-                                else:
-                                    continue
-
-                                if new_url not in self.crawled_urls and len(urls_to_crawl) < max_pages * 2:
-                                    urls_to_crawl.add(new_url)
-
+                            new_urls = self._discover_links_from_page(soup, url, domain)
+                            
+                            # Add new URLs to our list (up to our limit)
+                            for new_url in new_urls:
+                                if new_url not in urls_list and len(urls_list) < max_pages * 2:
+                                    urls_list.append(new_url)
+                        
                     except Exception as e:
                         logger.error(f"Error analyzing {url}: {e}")
                         self.stats.failed_pages += 1
                 else:
                     self.stats.failed_pages += 1
-
+                    
                 self.crawled_urls.add(url)
-
+                
                 # Respectful delay
                 if self.config.request_delay > 0:
                     await asyncio.sleep(self.config.request_delay)
-
+    
         logger.info(f"Enhanced crawl completed: {self.stats.successful_pages} successful, "
-                   f"{self.stats.failed_pages} failed, {self.stats.cached_pages} from cache")
-
+                    f"{self.stats.failed_pages} failed, {self.stats.cached_pages} from cache")
+        
         return self.pages_data, self.stats
 
 class EnhancedSEOEngine:
