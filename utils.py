@@ -64,15 +64,15 @@ def normalize_url(url: str) -> str:
 def sanitize_filename(text: str, max_length: int = 50) -> str:
     """Sanitize text for use as filename"""
     # Remove or replace invalid characters
-    text = re.sub(r'[<>:"/\|?*]', '_', text)
-    text = re.sub(r'[^\w\-_\.]', '_', text)
+    text = re.sub(r'[<>:"/\\|?*]', '_', text)  # FIXED: Added 'r' for raw string
+    text = re.sub(r'[^\w\-_\.]', '_', text)     # FIXED: Added 'r' for raw string
     text = re.sub(r'_+', '_', text)
     text = text.strip('_')
-
+    
     # Truncate if too long
     if len(text) > max_length:
         text = text[:max_length].rstrip('_')
-
+        
     return text or 'untitled'
 
 def format_duration(seconds: float) -> str:
