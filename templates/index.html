@@ -3,146 +3,292 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced SEO Audit Tool V3.0</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/enhanced-styles.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <title>Enhanced SEO Audit Tool V3.0 - Comprehensive Website Analysis</title>
+    <meta name="description" content="Professional SEO audit tool with advanced crawling, SERP analysis, and comprehensive reporting. Analyze your website's SEO performance with our enhanced V3.0 tool.">
+    <meta name="keywords" content="SEO audit, website analysis, SERP analysis, SEO tools, website optimization, technical SEO">
+    <meta name="author" content="Enhanced SEO Audit Tool">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Enhanced SEO Audit Tool V3.0">
+    <meta property="og:description" content="Professional SEO audit tool with advanced crawling, SERP analysis, and comprehensive reporting capabilities.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="/">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Enhanced SEO Audit Tool V3.0">
+    <meta name="twitter:description" content="Professional SEO audit tool with advanced crawling, SERP analysis, and comprehensive reporting capabilities.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🔍%3C/text%3E%3C/svg%3E">
+
+    <!-- Preload critical fonts -->
+    <link rel="preload" href="https://r2cdn.perplexity.ai/fonts/FKGroteskNeue.woff2" as="font" type="font/woff2" crossorigin>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/enhanced_style.css') }}">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Enhanced SEO Audit Tool V3.0",
+        "description": "Professional SEO audit tool with advanced crawling, SERP analysis, and comprehensive reporting capabilities.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web Browser",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "featureList": [
+            "Advanced web crawling",
+            "SERP competition analysis", 
+            "Smart caching system",
+            "Comprehensive CSV export",
+            "Technical SEO analysis",
+            "Content analysis"
+        ]
+    }
+    </script>
 </head>
 <body>
-    <div class="container">
-        <!-- System Status -->
-        <div class="system-status" id="system-status">
-            ⏳ Checking system status...
-        </div>
+    <!-- System Status Bar -->
+    <div class="system-status">
+        <span id="system-status">🟡 Checking system status...</span>
+        <span style="margin-left: 20px;">Enhanced SEO Audit Tool V3.0 FUNCTIONAL</span>
+    </div>
 
-        <!-- Header -->
+    <div class="container">
+        <!-- Header Section -->
         <header class="header">
-            <h1>🚀 Enhanced SEO Audit Tool V3.0</h1>
-            <p class="subtitle">Professional SEO analysis with advanced crawling, SERP analysis, and comprehensive reporting</p>
+            <h1>🔍 Enhanced SEO Audit Tool V3.0</h1>
+            <p class="subtitle">Professional website analysis with advanced crawling, SERP analysis, and comprehensive reporting</p>
             <div class="features">
                 <span>🌐 Whole Website Analysis</span>
                 <span>📊 SERP Competition Analysis</span>
                 <span>🚀 Smart Caching System</span>
-                <span>📈 Comprehensive CSV Export</span>
+                <span>📈 CSV Export</span>
+                <span>⚡ Enhanced Performance</span>
+                <span>🎯 Advanced Issue Detection</span>
             </div>
         </header>
 
         <!-- Alert Messages -->
-        <div id="error-message" class="alert" style="display: none;"></div>
+        <div id="error-message" class="alert alert-error" style="display: none;"></div>
 
         <!-- Form Section -->
-        <div id="form-section" class="card">
+        <section id="form-section" class="card">
             <div class="card-header">
-                <h2>🚀 Start Your SEO Analysis</h2>
+                <h2>🚀 Start Your Enhanced SEO Analysis</h2>
             </div>
             <div class="card__body">
                 <form id="enhanced-seo-form">
-                    <!-- Website URL -->
                     <div class="form-group">
-                        <label for="website-url" class="form-label">🌐 Website URL *</label>
-                        <input type="url" id="website-url" name="website_url" class="form-control" 
-                               placeholder="https://example.com" required>
+                        <label for="website-url" class="form-label">
+                            <strong>Website URL *</strong>
+                        </label>
+                        <input 
+                            type="url" 
+                            id="website-url" 
+                            name="website_url"
+                            class="form-control" 
+                            placeholder="https://example.com"
+                            required
+                            autocomplete="url"
+                            aria-describedby="url-help"
+                        >
+                        <small id="url-help" style="color: var(--color-text-secondary);">
+                            Enter the full URL of the website you want to analyze (include https://)
+                        </small>
                     </div>
 
-                    <!-- Target Keyword -->
                     <div class="form-group">
-                        <label for="target-keyword" class="form-label">🎯 Target Keyword *</label>
-                        <input type="text" id="target-keyword" name="target_keyword" class="form-control" 
-                               placeholder="digital marketing" required>
+                        <label for="target-keyword" class="form-label">
+                            <strong>Target Keyword *</strong>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="target-keyword" 
+                            name="target_keyword"
+                            class="form-control" 
+                            placeholder="e.g., digital marketing, web development"
+                            required
+                            aria-describedby="keyword-help"
+                        >
+                        <small id="keyword-help" style="color: var(--color-text-secondary);">
+                            The main keyword you want to optimize for (used for density analysis and SERP comparison)
+                        </small>
                     </div>
 
-                    <!-- Analysis Options -->
                     <div class="form-group">
-                        <h3>📊 Analysis Options</h3>
-                        
-                        <!-- Whole Website Toggle -->
-                        <div class="toggle-group">
-                            <div class="toggle-switch">
-                                <input type="checkbox" id="whole-website" name="whole_website">
-                                <span class="toggle-slider"></span>
-                            </div>
-                            <div>
-                                <label for="whole-website" class="form-label">🌍 Analyze Entire Website</label>
-                                <small>Discover and analyze all pages on the domain (may take longer)</small>
-                            </div>
-                        </div>
+                        <label for="max-pages" class="form-label">
+                            <strong>Pages to Analyze</strong>
+                        </label>
+                        <select id="max-pages" name="max_pages" class="form-control" aria-describedby="pages-help">
+                            <option value="5">5 pages</option>
+                            <option value="10" selected>10 pages</option>
+                            <option value="15">15 pages</option>
+                            <option value="20">20 pages</option>
+                            <option value="25">25 pages</option>
+                            <option value="50">50 pages</option>
+                        </select>
+                        <small id="pages-help" style="color: var(--color-text-secondary);">
+                            For focused analysis, start with 5-20 pages
+                        </small>
+                    </div>
 
-                        <!-- Max Pages -->
-                        <div class="form-group">
-                            <label for="max-pages" class="form-label">📄 Maximum Pages to Analyze</label>
-                            <select id="max-pages" name="max_pages" class="form-control">
-                                <option value="5">5 pages</option>
-                                <option value="10" selected>10 pages</option>
-                                <option value="25">25 pages</option>
-                                <option value="50">50 pages</option>
-                            </select>
-                            <small>For focused analysis, start with 5-20 pages</small>
+                    <!-- Enhanced Feature Toggles -->
+                    <div class="toggle-group">
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="whole-website" name="whole_website">
+                            <span class="toggle-slider"></span>
                         </div>
-
-                        <!-- SERP Analysis Toggle -->
-                        <div class="toggle-group">
-                            <div class="toggle-switch">
-                                <input type="checkbox" id="serp-analysis" name="serp_analysis" checked>
-                                <span class="toggle-slider"></span>
-                            </div>
-                            <div>
-                                <label for="serp-analysis" class="form-label">🔍 SERP Competitor Analysis</label>
-                                <small>Analyze search engine results for your target keyword</small>
+                        <div>
+                            <strong>🌐 Whole Website Analysis</strong>
+                            <div style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-top: 4px;">
+                                Discover and analyze ALL pages on the website (may take 10-30 minutes)
                             </div>
                         </div>
                     </div>
 
-                    <!-- Submit Button -->
-                    <button type="submit" id="start-analysis-btn" class="btn btn--primary btn--lg btn--full-width">
-                        🚀 Start Enhanced SEO Analysis
-                    </button>
+                    <div class="toggle-group">
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="serp-analysis" name="serp_analysis" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <div>
+                            <strong>📊 SERP Competition Analysis</strong>
+                            <div style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-top: 4px;">
+                                Analyze top 10 competitors for your target keyword
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex-center">
+                        <button type="submit" id="start-analysis-btn" class="btn btn--primary btn--lg btn--full-width">
+                            🚀 Start Enhanced SEO Analysis
+                        </button>
+                        <button type="button" id="cancel-analysis-btn" class="btn btn--secondary btn--lg" style="display: none;">
+                            🛑 Cancel Analysis
+                        </button>
+                    </div>
                 </form>
             </div>
-        </div>
+        </section>
 
         <!-- Progress Section -->
-        <div id="progress-section" class="progress-container" style="display: none;">
-            <h2>⚡ Analysis in Progress</h2>
-            
-            <div class="progress-bar" id="progress-bar">
-                <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
-            </div>
-            
-            <div class="progress-text" id="progress-text">
-                Initializing analysis...
-            </div>
-            
-            <div class="progress-details" id="progress-details">
-                Please wait while we analyze your website...
-            </div>
+        <section id="progress-section" class="card" style="display: none;">
+            <div class="progress-container">
+                <h2>🔄 Analysis in Progress</h2>
 
-            <div class="flex-center" style="margin-top: 20px;">
-                <button type="button" id="cancel-analysis-btn" class="btn btn--secondary">
-                    🛑 Cancel Analysis
-                </button>
-            </div>
-        </div>
+                <div class="progress-bar" id="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+                </div>
 
-        <!-- Results Section -->
-        <div id="results-section" class="results-container" style="display: none;">
-            <div class="results-header">
-                <h2>📊 Analysis Results</h2>
-                <div class="flex-center">
-                    <button type="button" id="csv-download-btn" class="btn btn--success" style="display: none;">
-                        📥 Download CSV Report
-                    </button>
-                    <button type="button" id="new-analysis-btn" class="btn btn--primary">
-                        🆕 New Analysis
+                <div class="progress-text" id="progress-text">
+                    Initializing enhanced SEO analysis...
+                </div>
+
+                <div class="progress-details" id="progress-details">
+                    Setting up comprehensive website analysis with advanced features
+                </div>
+
+                <div style="margin-top: var(--space-32);">
+                    <button type="button" id="cancel-analysis-btn" class="btn btn--secondary btn--lg">
+                        🛑 Cancel Analysis
                     </button>
                 </div>
             </div>
-            
-            <div class="report-content" id="report-content">
-                <!-- Results will be loaded here -->
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="card" style="display: none;">
+            <div class="results-container">
+                <div class="results-header">
+                    <h2>📊 Analysis Results</h2>
+                    <div class="flex-center">
+                        <button type="button" id="new-analysis-btn" class="btn btn--primary btn--lg">
+                            🆕 New Analysis
+                        </button>
+                        <button type="button" id="csv-download-btn" class="btn btn--success btn--lg" style="display: none;">
+                            📥 Download CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="report-content" id="report-content">
+                    <!-- SEO analysis results will be populated here by JavaScript -->
+                    <div class="loading">
+                        <p>Loading comprehensive SEO analysis results...</p>
+                    </div>
+                </div>
             </div>
-        </div>
+        </section>
+
+        <!-- Footer -->
+        <footer style="padding: var(--space-32); text-align: center; background: var(--color-secondary); color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+            <p>
+                <strong>Enhanced SEO Audit Tool V3.0</strong> | 
+                Built with ❤️ for comprehensive website analysis | 
+                <a href="#" style="color: var(--color-primary);">Documentation</a> | 
+                <a href="#" style="color: var(--color-primary);">Support</a>
+            </p>
+            <p style="margin-top: var(--space-8);">
+                🚀 <strong>FUNCTIONAL Features:</strong> 
+                Whole website analysis • SERP competition tracking • Smart caching system • 
+                Advanced issue detection • Comprehensive CSV export • Enhanced reporting
+            </p>
+        </footer>
     </div>
 
     <!-- JavaScript -->
-    <script src="{{ url_for('static', filename='js/enhanced-app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/enhanced_app.js') }}" defer></script>
+
+    <!-- Performance Monitoring -->
+    <script>
+        // Basic performance monitoring
+        window.addEventListener('load', function() {
+            if ('performance' in window && 'measure' in performance) {
+                try {
+                    const loadTime = performance.now();
+                    console.log(`🚀 Enhanced SEO Audit Tool loaded in ${loadTime.toFixed(2)}ms`);
+
+                    // Log navigation timing if available
+                    if (performance.getEntriesByType) {
+                        const navEntries = performance.getEntriesByType('navigation');
+                        if (navEntries.length > 0) {
+                            const nav = navEntries[0];
+                            console.log(`📊 Page load metrics:`, {
+                                domContentLoaded: nav.domContentLoadedEventEnd - nav.domContentLoadedEventStart,
+                                loadComplete: nav.loadEventEnd - nav.loadEventStart,
+                                totalTime: nav.loadEventEnd - nav.navigationStart
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.log('Performance monitoring error:', e);
+                }
+            }
+        });
+
+        // Enhanced error handling
+        window.addEventListener('error', function(event) {
+            console.error('🚨 JavaScript Error:', {
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                error: event.error
+            });
+        });
+
+        // Unhandled promise rejection handling
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('🚨 Unhandled Promise Rejection:', event.reason);
+        });
+    </script>
 </body>
 </html>
