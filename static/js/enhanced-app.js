@@ -271,10 +271,10 @@ async function startEnhancedAnalysis(formData) {
                 errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
             } catch (e) {
                 // Response is not JSON (likely HTML error page)
-                if (errorText.includes('<!DOCTYPE')) {
-                    errorMessage = `Server error (${response.status}). The service may be temporarily unavailable.`;
+                if (errorText.includes('<html')) {
+                    errorMessage = `Server error ${response.status}. Please check server logs.`;
                 } else {
-                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`;
                 }
             }
             
@@ -282,18 +282,16 @@ async function startEnhancedAnalysis(formData) {
         }
         
         const result = await response.json();
-        console.log("✅ Enhanced analysis started:", result.analysis_id);
+        console.log("✅ Analysis started:", result);
         
         ANALYSIS_STATE.currentAnalysisId = result.analysis_id;
         
-        // Show initial progress
-        updateProgress(5, 'Analysis Started', 'Enhanced SEO analysis has been queued for processing');
-        
-        // Start polling for updates
+        // Start polling for status
         startStatusPolling();
         
     } catch (error) {
-        console.error("❌ Enhanced analysis failed:", error);
+        console.error('Error starting analysis:', error);
+        ANALYSIS_STATE.isRunning = false;
         throw error;
     }
 }
@@ -301,8 +299,7 @@ async function startEnhancedAnalysis(formData) {
 async function fetchWithRetry(url, options, retries = CONFIG.MAX_RETRIES) {
     for (let i = 0; i < retries; i++) {
         try {
-            const response = await fetch(url, options);
-            return response;
+            return await fetch(url, options);
         } catch (error) {
             if (i === retries - 1) throw error;
             await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY * (i + 1)));
@@ -428,18 +425,18 @@ function displayResults(result) {
 
 function convertMarkdownToHTML(markdown) {
     return markdown
-        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-        .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
-        .replace(/^\* (.*$)/gm, '<li>$1</li>')
-        .replace(/^- (.*$)/gm, '<li>$1</li>')
+        .replace(/^# (.*)$/gm, '<h1>$1</h1>')
+        .replace(/^## (.*)$/gm, '<h2>$2</h2>')
+        .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+        .replace(/^#### (.*)$/gm, '<h4>$1</h4>')
+        .replace(/^\* (.*)$/gm, '<li>$1</li>')
+        .replace(/^- (.*)$/gm, '<li>$1</li>')
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/^\|(.*)\|$/gm, '<tr>$1</tr>')
         .replace(/\|/g, '</td><td>')
-        .replace(/<tr><td>/g, '<tr><td>')
-        .replace(/<\/td><td><\/tr>/g, '</td></tr>')
+        .replace(/<td><\/td>/g, '<td>')
+        .replace(/<\/td><\/tr>/g, '</td></tr>')
         .replace(/\n/g, '<br>');
 }
 
@@ -560,16 +557,16 @@ async function performHealthCheck() {
         
         if (DOM.systemStatus) {
             if (health.status === 'healthy') {
-                DOM.systemStatus.innerHTML = '<span style="color: green;">● System Online</span>';
+                DOM.systemStatus.innerHTML = '● System Online';
             } else {
-                DOM.systemStatus.innerHTML = '<span style="color: red;">● System Issues</span>';
+                DOM.systemStatus.innerHTML = '● System Issues';
             }
         }
         
     } catch (error) {
         console.error('Health check failed:', error);
         if (DOM.systemStatus) {
-            DOM.systemStatus.innerHTML = '<span style="color: red;">● Connection Error</span>';
+            DOM.systemStatus.innerHTML = '● Connection Error';
         }
     }
 }
