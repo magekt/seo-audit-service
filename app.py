@@ -447,8 +447,8 @@ def get_report(analysis_id):
 
             analysis = analyses[analysis_id]
 
-            if analysis.get('status') != 'completed':
-                return jsonify({'error': 'Analysis not completed yet'}), 400
+        if analysis.get('status') != 'completed':
+            return jsonify({'error': 'Analysis not completed yet'}), 400
 
         return jsonify({
             'analysis_id': analysis_id,
@@ -479,8 +479,8 @@ def download_csv(analysis_id):
 
             analysis = analyses[analysis_id]
 
-            if analysis.get('status') != 'completed':
-                return jsonify({'error': 'Analysis not completed yet'}), 400
+        if analysis.get('status') != 'completed':
+            return jsonify({'error': 'Analysis not completed yet'}), 400
 
         csv_path = analysis.get('csv_data_path')
         if not csv_path or not os.path.exists(csv_path):
