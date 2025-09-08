@@ -1,18 +1,162 @@
 """
-Enhanced SEO Audit Tool - Utility Functions V3.0
-Production-ready utility functions with comprehensive validation
+Enhanced SEO Audit Tool - Complete Utility Functions V3.0
+Production-ready utility functions with comprehensive validation and all required functions
 """
 
 import re
 import os
 import time
-from urllib.parse import urlparse, urlunparse
-from pathlib import Path
-from typing import Optional, Dict, Any
-import validators
+import json
 import logging
+from pathlib import Path
+from datetime import datetime, timedelta
+from urllib.parse import urlparse, urlunparse
+from typing import Optional, Dict, Any, List
+import validators
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting storage (in production, use Redis or database)
+RATE_LIMIT_STORAGE = {}
+
+def setup_logging():
+    """Setup application logging"""
+    log_level = os.getenv('LOG_LEVEL', 'INFO')
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('logs/seo_audit.log', encoding='utf-8')
+        ]
+    )
+
+    # Ensure logs directory exists
+    Path('logs').mkdir(exist_ok=True)
+
+def load_config():
+    """Load configuration based on environment"""
+    from config import get_config
+    config_class = get_config()
+    return config_class()
+
+def setup_directories():
+    """Create necessary directories for the application"""
+    directories = [
+        'logs',
+        'reports', 
+        'exports',
+        'cache',
+        'static/css',
+        'static/js',
+        'static/img',
+        'templates'
+    ]
+
+    for directory in directories:
+        Path(directory).mkdir(parents=True, exist_ok=True)
+        logger.info(f"✅ Directory ensured: {directory}")
+
+def get_client_ip(request) -> str:
+    """Get client IP address from request"""
+    # Check for forwarded IP first (behind proxy)
+    forwarded_for = request.headers.get('X-Forwarded-For')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+
+    # Check for real IP header
+    real_ip = request.headers.get('X-Real-IP')
+    if real_ip:
+        return real_ip
+
+    # Fall back to remote address
+    return request.remote_addr or 'unknown'
+
+def rate_limit_check(client_ip: str, limit: int = 10, window_minutes: int = 60) -> bool:
+    """
+    Check if client has exceeded rate limit
+    Returns True if request is allowed, False if rate limited
+    """
+    now = datetime.now()
+    window_start = now - timedelta(minutes=window_minutes)
+
+    # Clean old entries
+    if client_ip in RATE_LIMIT_STORAGE:
+        RATE_LIMIT_STORAGE[client_ip] = [
+            timestamp for timestamp in RATE_LIMIT_STORAGE[client_ip] 
+            if timestamp > window_start
+        ]
+    else:
+        RATE_LIMIT_STORAGE[client_ip] = []
+
+    # Check current count
+    current_count = len(RATE_LIMIT_STORAGE[client_ip])
+
+    if current_count >= limit:
+        return False
+
+    # Add current request
+    RATE_LIMIT_STORAGE[client_ip].append(now)
+    return True
+
+def format_elapsed_time(seconds: float) -> str:
+    """Format elapsed time in human-readable format"""
+    if seconds < 60:
+        return f"{seconds:.1f} seconds"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        remaining_seconds = int(seconds % 60)
+        return f"{minutes}m {remaining_seconds}s"
+    else:
+        hours = int(seconds // 3600)
+        remaining_minutes = int((seconds % 3600) // 60)
+        return f"{hours}h {remaining_minutes}m"
+
+def validate_analysis_params(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate analysis parameters from request
+    Returns: {'valid': bool, 'message': str, 'data': dict}
+    """
+    if not isinstance(data, dict):
+        return {'valid': False, 'message': 'Invalid data format'}
+
+    # Required fields
+    required_fields = ['website_url', 'target_keyword']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return {'valid': False, 'message': f'Missing required field: {field}'}
+
+    website_url = data['website_url'].strip()
+    target_keyword = data['target_keyword'].strip()
+
+    # Validate URL format
+    if not website_url.startswith(('http://', 'https://')):
+        website_url = 'https://' + website_url
+        data['website_url'] = website_url
+
+    # Validate URL using existing function
+    if not validate_url(website_url):
+        return {'valid': False, 'message': 'Invalid website URL format'}
+
+    # Validate keyword using existing function  
+    if not is_valid_keyword(target_keyword):
+        return {'valid': False, 'message': 'Invalid target keyword format'}
+
+    # Validate optional numeric fields
+    try:
+        max_pages = int(data.get('max_pages', 10))
+        if max_pages < 1 or max_pages > 1000:  # Using higher limit
+            return {'valid': False, 'message': 'max_pages must be between 1 and 1000'}
+        data['max_pages'] = max_pages
+    except (ValueError, TypeError):
+        return {'valid': False, 'message': 'max_pages must be a valid number'}
+
+    # Validate boolean fields
+    data['whole_website'] = bool(data.get('whole_website', False))
+    data['serp_analysis'] = bool(data.get('serp_analysis', True)) 
+    data['use_cache'] = bool(data.get('use_cache', True))
+
+    return {'valid': True, 'message': 'Valid parameters', 'data': data}
 
 def validate_url(url: str) -> bool:
     """
@@ -434,8 +578,8 @@ def validate_analysis_config(config: Dict[str, Any]) -> Dict[str, Any]:
         max_pages = int(max_pages)
         if max_pages < 1:
             max_pages = 1
-        elif max_pages > 100:
-            max_pages = 100
+        elif max_pages > 1000:  # Increased limit
+            max_pages = 1000
         validated['max_pages'] = max_pages
     except (ValueError, TypeError):
         validated['max_pages'] = 10
@@ -450,6 +594,85 @@ def validate_analysis_config(config: Dict[str, Any]) -> Dict[str, Any]:
     validated['use_cache'] = bool(config.get('use_cache', True))
 
     return validated
+
+# Cache cleanup function
+def cleanup_old_files(directory: str, days: int = 7):
+    """Clean up old files from specified directory"""
+    try:
+        dir_path = Path(directory)
+        if not dir_path.exists():
+            return
+
+        cutoff_time = time.time() - (days * 24 * 60 * 60)
+
+        for file_path in dir_path.iterdir():
+            if file_path.is_file() and file_path.stat().st_mtime < cutoff_time:
+                try:
+                    file_path.unlink()
+                    logger.info(f"Cleaned up old file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Error cleaning up {file_path}: {e}")
+
+    except Exception as e:
+        logger.error(f"Error in cleanup_old_files: {e}")
+
+# Enhanced error reporting
+def create_error_response(error_message: str, status_code: int = 500) -> Dict[str, Any]:
+    """Create standardized error response"""
+    return {
+        'error': True,
+        'message': error_message,
+        'status_code': status_code,
+        'timestamp': datetime.now().isoformat(),
+        'suggestions': [
+            'Check your internet connection',
+            'Verify the website URL is correct',
+            'Try again in a few minutes',
+            'Contact support if the issue persists'
+        ]
+    }
+
+# Health check utilities
+def check_system_health() -> Dict[str, Any]:
+    """Perform system health checks"""
+    health_status = {
+        'status': 'healthy',
+        'checks': {},
+        'timestamp': datetime.now().isoformat()
+    }
+
+    # Check disk space
+    try:
+        import shutil
+        total, used, free = shutil.disk_usage('.')
+        health_status['checks']['disk_space'] = {
+            'status': 'healthy' if free > 1024*1024*1024 else 'warning',  # 1GB free
+            'free_gb': free / (1024**3),
+            'total_gb': total / (1024**3)
+        }
+    except Exception as e:
+        health_status['checks']['disk_space'] = {'status': 'error', 'error': str(e)}
+
+    # Check directories
+    required_dirs = ['logs', 'reports', 'exports', 'cache']
+    for dir_name in required_dirs:
+        dir_path = Path(dir_name)
+        health_status['checks'][f'{dir_name}_dir'] = {
+            'status': 'healthy' if dir_path.exists() else 'error',
+            'exists': dir_path.exists()
+        }
+
+    return health_status
+
+# Data export utilities  
+def safe_json_serialize(obj):
+    """Safely serialize objects to JSON"""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif hasattr(obj, '__dict__'):
+        return obj.__dict__
+    else:
+        return str(obj)
 
 # Error handling utilities
 class SEOAnalysisError(Exception):
