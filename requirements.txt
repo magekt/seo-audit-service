@@ -1,4 +1,9 @@
-# Enhanced SEO Audit Tool V3.0 - Production Dependencies
+# Enhanced SEO Audit Tool V3.0 - Fixed Production Dependencies
+# Compatible with Python 3.11+ including Python 3.13
+
+# Essential Build Tools (CRITICAL FIX for setuptools error)
+setuptools>=68.0.0
+wheel>=0.38.0
 
 # Core Flask Framework
 Flask==2.3.3
@@ -13,70 +18,26 @@ requests==2.31.0
 # URL and Data Validation
 validators==0.22.0
 
-# Data Processing and Analysis  
+# Data Processing and Analysis 
 pandas==2.0.3
 numpy==1.24.4
-
-# Database
-sqlite3  # Built into Python
-
-# Async Support
-asyncio  # Built into Python
 
 # Text Processing and Analysis
 textstat==0.7.3
 
-# File and Path Handling
-pathlib  # Built into Python
-
-# Date and Time
-datetime  # Built into Python
-
-# Logging
-logging  # Built into Python
-
-# JSON Processing  
-json  # Built into Python
-
-# Regular Expressions
-re  # Built into Python
-
-# URL Parsing
+# URL Processing (fixed version for Python 3.13 compatibility)
 urllib3==2.0.7
 
-# Hash Functions
-hashlib  # Built into Python
+# Production Dependencies
+gunicorn==21.2.0
+python-dotenv==1.0.0
 
-# Threading
-threading  # Built into Python
+# NOTE: Built-in modules removed (sqlite3, asyncio, pathlib, datetime, logging, 
+#       json, re, hashlib, threading, time, uuid, os, sys, collections, 
+#       dataclasses, typing) - these don't need to be in requirements.txt
 
-# Time Functions
-time  # Built into Python
-
-# UUID Generation
-uuid  # Built into Python
-
-# Operating System Interface
-os  # Built into Python
-
-# System-specific Parameters
-sys  # Built into Python
-
-# Collections
-collections  # Built into Python
-
-# Data Classes
-dataclasses  # Built into Python (Python 3.7+)
-
-# Type Hints
-typing  # Built into Python
-
-# Optional Dependencies for Enhanced Features
-gunicorn==21.2.0  # Production WSGI server
-python-dotenv==1.0.0  # Environment variable management
-
-# Development Dependencies (optional)
+# Development Dependencies (uncomment for development)
 # pytest==7.4.2
-# black==23.7.0  
+# black==23.7.0 
 # flake8==6.1.0
 # mypy==1.5.1
