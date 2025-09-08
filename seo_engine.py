@@ -140,7 +140,7 @@ class CacheManager:
                     analysis_count INTEGER DEFAULT 1
                 )
             """)
-            
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS analysis_sessions (
                     session_id TEXT PRIMARY KEY,
@@ -153,7 +153,7 @@ class CacheManager:
                     status TEXT
                 )
             """)
-            
+
             # Create indexes separately - ONE AT A TIME
             conn.execute("CREATE INDEX IF NOT EXISTS idx_domain ON page_cache(domain)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON page_cache(created_at)")
@@ -181,7 +181,7 @@ class CacheManager:
 
         except Exception as e:
             logger.warning(f"Cache retrieval error for {url}: {e}")
-            return None
+        return None
 
     def cache_page(self, page_data: SEOPageData, content_hash: str):
         """Cache page data"""
@@ -370,26 +370,26 @@ class EnhancedSEOCrawler:
         parsed_url = urlparse(start_url)
         base_domain = parsed_url.netloc
         discovered = {start_url}  # Always include start URL
-        
+
         try:
             # Step 1: Check common sitemap locations
             logger.info("📋 Checking sitemaps...")
             await self._check_common_sitemaps(start_url, discovered)
             logger.info(f"Found {len(discovered)} URLs from sitemaps")
-            
+
             # Step 2: Check robots.txt for additional sitemaps
             logger.info("🤖 Checking robots.txt...")
             await self._check_robots_for_sitemaps(start_url, discovered)
             logger.info(f"Found {len(discovered)} URLs after robots.txt")
-            
+
             # Step 3: AGGRESSIVE link discovery from pages
             logger.info("🔗 Starting recursive link discovery...")
             await self._recursive_link_discovery(start_url, base_domain, discovered, max_depth=5)
             logger.info(f"Found {len(discovered)} URLs after link discovery")
-            
+
         except Exception as e:
             logger.error(f"Error in URL discovery: {e}")
-        
+
         # FUNCTIONAL: Remove duplicates and clean URLs
         cleaned_discovered = set()
         for url in discovered:
@@ -403,7 +403,7 @@ class EnhancedSEOCrawler:
                 cleaned_discovered.add(clean_url)
             except:
                 continue
-        
+
         logger.info(f"🎯 Final discovery result: {len(cleaned_discovered)} unique URLs for domain {base_domain}")
         self.discovered_urls = cleaned_discovered
         return cleaned_discovered
@@ -412,7 +412,7 @@ class EnhancedSEOCrawler:
         """FUNCTIONAL: Check common sitemap locations with enhanced parsing"""
         parsed = urlparse(base_url)
         base = f"{parsed.scheme}://{parsed.netloc}"
-        
+
         # EXPANDED sitemap locations
         sitemap_paths = [
             '/sitemap.xml',
@@ -455,7 +455,7 @@ class EnhancedSEOCrawler:
                             sitemap_url = line.split(':', 1)[1].strip()
                             await self._fetch_and_parse_sitemap(sitemap_url, discovered)
                             sitemap_count += 1
-                    
+
                     if sitemap_count > 0:
                         logger.info(f"✅ Found {sitemap_count} sitemaps in robots.txt")
 
@@ -466,16 +466,16 @@ class EnhancedSEOCrawler:
         """FUNCTIONAL: Fetch and parse sitemap with support for compressed files and sitemap indexes"""
         if sitemap_url in self._seen_sitemaps:
             return
-        
+
         self._seen_sitemaps.add(sitemap_url)
-        
+
         try:
             async with self.session.get(sitemap_url, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status != 200:
                     return
-                
+
                 raw_content = await response.read()
-                
+
                 # Handle compressed sitemaps
                 if sitemap_url.endswith('.gz'):
                     try:
@@ -485,7 +485,7 @@ class EnhancedSEOCrawler:
                         return
                 else:
                     content = raw_content.decode('utf-8', errors='ignore')
-                
+
                 # Parse sitemap content
                 if sitemap_url.endswith('.xml') or sitemap_url.endswith('.xml.gz'):
                     urls = await self._parse_xml_sitemap(content, sitemap_url)
@@ -494,10 +494,10 @@ class EnhancedSEOCrawler:
                 else:
                     # Try XML parsing for feeds and other formats
                     urls = await self._parse_xml_sitemap(content, sitemap_url)
-                
+
                 discovered.update(urls)
                 self.sitemap_urls.update(urls)
-                
+
                 if urls:
                     logger.info(f"📋 Found {len(urls)} URLs in sitemap: {sitemap_url}")
 
@@ -534,7 +534,7 @@ class EnhancedSEOCrawler:
                     link = item.find('link')
                     if link and link.get_text().strip():
                         urls.add(link.get_text().strip())
-                
+
                 # Try Atom format
                 entry_tags = soup.find_all('entry')
                 for entry in entry_tags:
@@ -562,27 +562,27 @@ class EnhancedSEOCrawler:
         # IMPROVED: Better limits for comprehensive discovery
         if current_depth >= max_depth or len(discovered) > 2000:  # Increased limit
             return
-        
+
         try:
             html, status_code, _, _ = await self.fetch_page(start_url)
             if html and status_code == 200:
                 soup = BeautifulSoup(html, 'html.parser')
-                
+
                 # Find all internal links
                 links_found = 0
                 for link in soup.find_all('a', href=True):
                     if links_found >= 200:  # Increased per-page limit
                         break
-                    
+
                     href = link['href']
-                    
+
                     if href.startswith('/'):
                         full_url = urljoin(start_url, href)
                     elif href.startswith('http'):
                         full_url = href
                     else:
                         continue
-                    
+
                     parsed = urlparse(full_url)
                     if parsed.netloc == base_domain and full_url not in discovered:
                         # Clean URL (remove fragments and query params for better deduplication)
@@ -590,13 +590,13 @@ class EnhancedSEOCrawler:
                         if clean_url not in discovered:
                             discovered.add(clean_url)
                             links_found += 1
-                            
-                            # FUNCTIONAL: Continue recursive crawling with better depth management
-                            if current_depth < 3 and len(discovered) < 1500:
-                                await self._recursive_link_discovery(
-                                    clean_url, base_domain, discovered, max_depth, current_depth + 1
-                                )
-                
+
+                    # FUNCTIONAL: Continue recursive crawling with better depth management
+                    if current_depth < 3 and len(discovered) < 1500:
+                        await self._recursive_link_discovery(
+                            clean_url, base_domain, discovered, max_depth, current_depth + 1
+                        )
+
         except Exception as e:
             logger.debug(f"Error in recursive discovery from {start_url}: {e}")
 
@@ -1056,11 +1056,11 @@ class EnhancedSEOCrawler:
                                    whole_website: bool = False, force_fresh: bool = False) -> Tuple[List[SEOPageData], CrawlStats]:
         """FUNCTIONAL: Enhanced crawling with proper pagination and comprehensive discovery"""
         logger.info(f"🚀 Starting FUNCTIONAL enhanced crawl of {start_url} (whole_website: {whole_website}, force_fresh: {force_fresh})")
-        
+
         # Get cached URLs (but ignore if force_fresh is True)
         domain = urlparse(start_url).netloc
         cached_urls = set() if force_fresh else self.cache_manager.get_cached_urls_for_domain(domain)
-        
+
         if whole_website:
             # FUNCTIONAL: Discover ALL URLs for the domain
             urls_to_crawl = await self.discover_urls(start_url)
@@ -1069,26 +1069,26 @@ class EnhancedSEOCrawler:
             # For selective analysis, start with homepage and discover gradually
             urls_to_crawl = {start_url}
             max_pages = max_pages or 10
-        
+
         # Convert to list for processing
         urls_list = list(urls_to_crawl)
-        
+
         # FUNCTIONAL: Process URLs with enhanced concurrency control
         semaphore = asyncio.Semaphore(self.config.max_concurrent_requests)
         crawled_count = 0
-        
+
         # Main crawling loop
         for i, url in enumerate(urls_list):
             # Check page limit for selective analysis only
             if not whole_website and max_pages and crawled_count >= max_pages:
                 logger.info(f"✅ Reached page limit of {max_pages} for selective analysis")
                 break
-            
+
             if url in self.crawled_urls:
                 continue
-            
+
             self.stats.total_pages += 1
-            
+
             # FUNCTIONAL: Check cache first (unless force_fresh)
             if not force_fresh:
                 cached_page = self.cache_manager.get_cached_page(url)
@@ -1099,70 +1099,70 @@ class EnhancedSEOCrawler:
                     crawled_count += 1
                     logger.info(f"💾 Using cached data for: {url}")
                     continue
-            
+
             # Crawl page
             async with semaphore:
                 current_total = len(urls_list) if whole_website else max_pages
                 logger.info(f"🔍 Crawling ({crawled_count + 1}/{current_total if not whole_website else 'ALL'}): {url}")
                 html, status_code, load_time, content_type = await self.fetch_page(url)
-                
+
                 if html and status_code == 200:
                     try:
                         # FUNCTIONAL: Enhanced SEO analysis
                         page_data = self.analyze_page_seo_enhanced(
                             url, html, target_keyword, status_code, load_time, content_type
                         )
-                        
+
                         page_data.page_depth = crawled_count
                         self.pages_data.append(page_data)
                         self.stats.successful_pages += 1
                         self.stats.total_issues += len(page_data.seo_issues)
                         crawled_count += 1
-                        
+
                         # Cache the page data (even if force_fresh was used)
                         content_hash = hashlib.md5(html.encode()).hexdigest()
                         self.cache_manager.cache_page(page_data, content_hash)
-                        
+
                         # FUNCTIONAL: Discover more URLs from this page for selective analysis
                         if not whole_website and crawled_count < max_pages:
                             soup = BeautifulSoup(html, 'html.parser')
                             new_urls = self._discover_links_from_page(soup, url, domain)
-                            
+
                             # Add new URLs to our list
                             for new_url in new_urls:
                                 if new_url not in urls_list and len(urls_list) < max_pages * 5:  # Increased discovery
                                     urls_list.append(new_url)
-                        
+
                     except Exception as e:
                         logger.error(f"Error analyzing {url}: {e}")
                         self.stats.failed_pages += 1
                 else:
                     logger.warning(f"Failed to fetch {url}: status {status_code}")
                     self.stats.failed_pages += 1
-                
-                self.crawled_urls.add(url)
-                
-                # Respectful delay
-                if self.config.request_delay > 0:
-                    await asyncio.sleep(self.config.request_delay)
-        
+
+            self.crawled_urls.add(url)
+
+            # Respectful delay
+            if self.config.request_delay > 0:
+                await asyncio.sleep(self.config.request_delay)
+
         logger.info(f"✅ FUNCTIONAL enhanced crawl completed: {self.stats.successful_pages} successful, "
                    f"{self.stats.failed_pages} failed, {self.stats.cached_pages} from cache")
-        
+
         return self.pages_data, self.stats
 
     def _discover_links_from_page(self, soup: BeautifulSoup, current_url: str, domain: str) -> List[str]:
         """FUNCTIONAL: Discover additional links from the current page for selective analysis"""
         new_urls = []
-        
+
         # Find all internal links
         for link in soup.find_all('a', href=True):
             href = link['href']
-            
+
             # Skip javascript, mailto, tel, and anchor links
             if href.startswith(('javascript:', 'mailto:', 'tel:', '#')):
                 continue
-            
+
             try:
                 if href.startswith('/'):
                     absolute_url = urljoin(current_url, href)
@@ -1170,19 +1170,19 @@ class EnhancedSEOCrawler:
                     absolute_url = href
                 else:
                     absolute_url = urljoin(current_url, href)
-                
+
                 parsed_url = urlparse(absolute_url)
-                
+
                 # Only include URLs from the same domain
                 if parsed_url.netloc == domain:
                     # Clean URL (remove fragments and query params for basic pages)
                     clean_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
                     if clean_url not in self.crawled_urls:
                         new_urls.append(clean_url)
-                
+
             except Exception:
                 continue
-        
+
         return new_urls[:50]  # Increased limit to 50 new URLs per page
 
 class EnhancedSEOEngine:
@@ -1343,7 +1343,7 @@ class EnhancedSEOEngine:
         # FUNCTIONAL: Enhanced report with better insights
         analysis_type = "Whole Website Analysis" if whole_website else "Selective Page Analysis"
         fresh_pages = len(pages_data) - crawl_stats.cached_pages
-        
+
         # Generate comprehensive report
         report_lines = [
             "# 🔍 COMPREHENSIVE SEO AUDIT REPORT - ENHANCED V3.0 FUNCTIONAL",
@@ -1463,7 +1463,7 @@ class EnhancedSEOEngine:
         return max(0.0, min(100.0, score))
 
     async def _export_comprehensive_csv(self, pages_data: List[SEOPageData], 
-                                      target_keyword: str, serp_results: List[SERPResult]) -> str:
+                                       target_keyword: str, serp_results: List[SERPResult]) -> str:
         """Export comprehensive CSV data"""
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
