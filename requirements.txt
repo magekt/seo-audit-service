@@ -1,51 +1,82 @@
-# Enhanced SEO Audit Tool V3.0 - Based on Working v2.0 Dependencies
+# Enhanced SEO Audit Tool V3.0 - Production Dependencies
 
-# Core framework and web server
-Flask==3.0.3
-Werkzeug==3.0.3
-gunicorn==22.0.0
-flask-cors==4.0.1
+# Core Flask Framework
+Flask==2.3.3
+Flask-CORS==4.0.0
 
-# HTTP client libraries
-aiohttp==3.9.5
-requests==2.32.3
-urllib3==2.2.2
+# HTTP and Web Scraping
+aiohttp==3.8.6
+beautifulsoup4==4.12.2
+lxml==4.9.3
+requests==2.31.0
 
-# HTML parsing and web scraping
-beautifulsoup4==4.12.3
-lxml==5.2.2
+# URL and Data Validation
+validators==0.22.0
 
-# Data manipulation and analysis (PROVEN WORKING VERSIONS)
-pandas>=2.2.0
-numpy>=1.26.0
-openpyxl==3.1.5
+# Data Processing and Analysis  
+pandas==2.0.3
+numpy==1.24.4
 
-# Configuration management
-PyYAML==6.0.1
-python-dotenv==1.0.1
+# Database
+sqlite3  # Built into Python
 
-# Date/time utilities
-python-dateutil==2.9.0
+# Async Support
+asyncio  # Built into Python
 
-# Progress bars and CLI utilities
-tqdm==4.66.4
-click==8.1.7
+# Text Processing and Analysis
+textstat==0.7.3
 
-# Validation and data processing
-validators==0.33.0
+# File and Path Handling
+pathlib  # Built into Python
 
-# Async utilities
-asyncio-throttle==1.0.2
+# Date and Time
+datetime  # Built into Python
 
-# Production monitoring
-structlog==24.4.0
+# Logging
+logging  # Built into Python
 
-# SSL certificates
-certifi==2024.8.30
+# JSON Processing  
+json  # Built into Python
 
-# V3.0 Enhanced Features - Additional Dependencies
-sqlalchemy==2.0.25
-xmltodict==0.13.0
-cryptography==43.0.0
-Pillow==10.4.0
-psutil==6.0.0
+# Regular Expressions
+re  # Built into Python
+
+# URL Parsing
+urllib3==2.0.7
+
+# Hash Functions
+hashlib  # Built into Python
+
+# Threading
+threading  # Built into Python
+
+# Time Functions
+time  # Built into Python
+
+# UUID Generation
+uuid  # Built into Python
+
+# Operating System Interface
+os  # Built into Python
+
+# System-specific Parameters
+sys  # Built into Python
+
+# Collections
+collections  # Built into Python
+
+# Data Classes
+dataclasses  # Built into Python (Python 3.7+)
+
+# Type Hints
+typing  # Built into Python
+
+# Optional Dependencies for Enhanced Features
+gunicorn==21.2.0  # Production WSGI server
+python-dotenv==1.0.0  # Environment variable management
+
+# Development Dependencies (optional)
+# pytest==7.4.2
+# black==23.7.0  
+# flake8==6.1.0
+# mypy==1.5.1
