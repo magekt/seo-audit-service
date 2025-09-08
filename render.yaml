@@ -1,20 +1,13 @@
 services:
   - type: web
-    name: seo-audit-tool-v3-enhanced
-    runtime: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 300 app:app"
+    name: seo-audit-service
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:application --workers 2 --timeout 120
     envVars:
       - key: FLASK_ENV
         value: production
-      - key: APP_VERSION
-        value: "3.0.0"
-      - key: SECRET_KEY
-        generateValue: true
-      - key: PORT
-        value: 10000
-      
-      # V3.0 Enhanced Features
       - key: MAX_CONCURRENT_REQUESTS
         value: 3
       - key: REQUEST_TIMEOUT
@@ -23,17 +16,12 @@ services:
         value: true
       - key: SERP_ANALYSIS_ENABLED
         value: true
-      - key: WHOLE_WEBSITE_MAX_PAGES
-        value: 200
-      - key: ENHANCED_REPORTING
-        value: true
       - key: RATE_LIMIT_REQUESTS
         value: 5
-      
-    healthCheckPath: "/api/health"
-    numInstances: 1
-    plan: free
-    region: oregon
-    scaling:
-      minInstances: 0
-      maxInstances: 1
+      - key: RATE_LIMIT_WINDOW
+        value: 60
+      - key: MAX_PAGES_LIMIT
+        value: 50
+      - key: WHOLE_WEBSITE_MAX_PAGES
+        value: 500
+    healthCheckPath: /api/health
