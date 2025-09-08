@@ -3,8 +3,10 @@ services:
     name: seo-audit-service
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT app:application --workers 2 --timeout 120
+    buildCommand: |
+      pip install --upgrade pip setuptools wheel
+      pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app --workers 2 --timeout 120 --max-requests 1000 --max-requests-jitter 50
     envVars:
       - key: FLASK_ENV
         value: production
@@ -24,4 +26,6 @@ services:
         value: 50
       - key: WHOLE_WEBSITE_MAX_PAGES
         value: 500
+      - key: PYTHON_VERSION
+        value: "3.11"
     healthCheckPath: /api/health
