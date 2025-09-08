@@ -9,7 +9,7 @@ console.log("🎯 Enhanced SEO Audit Tool V3.0 JavaScript loaded successfully!")
 const CONFIG = {
     API_BASE: window.location.origin,
     STATUS_POLL_INTERVAL: 2000, // Reduced to 2 seconds for better responsiveness
-    MAX_RETRIES: 3,
+    MAX_RETRIES: 5,
     RETRY_DELAY: 2000
 };
 
