@@ -14,7 +14,6 @@ from datetime import datetime, timedelta
 from threading import Thread, Lock
 from pathlib import Path
 from typing import Dict, Any, Optional
-
 import validators
 from flask import Flask, request, jsonify, render_template, send_file, url_for
 from flask_cors import CORS
@@ -26,7 +25,7 @@ from config import Config
 import utils
 
 # Enhanced logging configuration
-os.makedirs('logs', exist_ok=True)  # CREATE LOGS DIRECTORY FIRST
+os.makedirs('logs', exist_ok=True)
 os.makedirs('reports', exist_ok=True)
 os.makedirs('exports', exist_ok=True)
 os.makedirs('cache', exist_ok=True)
@@ -43,7 +42,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('logs/app.log'),  # NOW THIS WILL WORK
+        logging.FileHandler('logs/app.log'),
         logging.StreamHandler()
     ]
 )
@@ -69,7 +68,6 @@ class RateLimiter:
     def is_allowed(self, client_ip: str = None) -> bool:
         if not client_ip:
             client_ip = request.remote_addr
-
         now = time.time()
         if client_ip not in self.requests:
             self.requests[client_ip] = []
@@ -82,17 +80,14 @@ class RateLimiter:
 
         if len(self.requests[client_ip]) >= self.max_requests:
             return False
-
         self.requests[client_ip].append(now)
         return True
 
     def time_until_allowed(self, client_ip: str = None) -> int:
         if not client_ip:
             client_ip = request.remote_addr
-
         if client_ip not in self.requests or not self.requests[client_ip]:
             return 0
-
         oldest_request = min(self.requests[client_ip])
         return max(0, int(self.window_seconds - (time.time() - oldest_request)))
 
@@ -113,7 +108,7 @@ class ProgressTracker:
     def get_status(self):
         elapsed = time.time() - self.start_time
         percentage = min(100, (self.current_step / self.total_steps) * 100)
-
+        
         # Estimate remaining time
         if self.current_step > 0:
             time_per_step = elapsed / self.current_step
@@ -137,7 +132,7 @@ class EnhancedAnalysisManager:
         self.active_analyses = {}
 
     def start_enhanced_analysis(self, analysis_id: str, website_url: str, target_keyword: str,
-                               max_pages: int, whole_website: bool = False):
+                              max_pages: int, whole_website: bool = False):
         """Start enhanced SEO analysis with new features"""
         def run_enhanced_analysis():
             try:
@@ -160,7 +155,7 @@ class EnhancedAnalysisManager:
                 # Update status to running
                 with analyses_lock:
                     analyses[analysis_id]['status'] = 'running'
-                    analyses[analysis_id]['progress'] = 'Initializing enhanced SEO analysis with advanced features'
+                    analyses[analysis_id]['progress'] = 'Initializing enhanced SEO analysis with advanced features...'
 
                 logger.info(f"Starting enhanced analysis {analysis_id} for {website_url}")
 
@@ -169,8 +164,9 @@ class EnhancedAnalysisManager:
                     total_steps=7 if whole_website else 5,
                     description=f"Enhanced SEO Analysis for {website_url}"
                 )
-
-                analyses[analysis_id]['progress_tracker'] = progress_tracker
+                
+                with analyses_lock:
+                    analyses[analysis_id]['progress_tracker'] = progress_tracker
 
                 # Step 1: Enhanced Validation
                 progress_tracker.increment("Enhanced validation and caching check")
@@ -332,7 +328,7 @@ def start_analysis_endpoint():
             'serp_analysis': serp_analysis,
             'use_cache': use_cache,
             'status': 'queued',
-            'progress': 'Enhanced analysis queued for processing',
+            'progress': 'Enhanced analysis queued for processing...',
             'started_at': datetime.now().isoformat(),
             'user_agent': request.headers.get('User-Agent', ''),
             'client_ip': request.remote_addr,
@@ -411,7 +407,7 @@ def check_status(analysis_id):
         # Don't return full report in status (too large)
         if 'report' in analysis:
             analysis['has_report'] = True
-            preview = analysis['report'][:300] + '(truncated)' if len(analysis['report']) > 300 else analysis['report']
+            preview = analysis['report'][:300] + '...' if len(analysis['report']) > 300 else analysis['report']
             analysis['report_preview'] = preview
             del analysis['report']
 
@@ -451,8 +447,8 @@ def get_report(analysis_id):
 
             analysis = analyses[analysis_id]
 
-        if analysis.get('status') != 'completed':
-            return jsonify({'error': 'Analysis not completed yet'}), 400
+            if analysis.get('status') != 'completed':
+                return jsonify({'error': 'Analysis not completed yet'}), 400
 
         return jsonify({
             'analysis_id': analysis_id,
@@ -483,8 +479,8 @@ def download_csv(analysis_id):
 
             analysis = analyses[analysis_id]
 
-        if analysis.get('status') != 'completed':
-            return jsonify({'error': 'Analysis not completed yet'}), 400
+            if analysis.get('status') != 'completed':
+                return jsonify({'error': 'Analysis not completed yet'}), 400
 
         csv_path = analysis.get('csv_data_path')
         if not csv_path or not os.path.exists(csv_path):
@@ -555,15 +551,15 @@ def get_cache_statistics():
         # Get cache statistics from SQLite
         with sqlite3.connect(cache_manager.db_path) as conn:
             cursor = conn.cursor()
-
+            
             # Total cached pages
             cursor.execute("SELECT COUNT(*) FROM page_cache")
             total_cached = cursor.fetchone()[0]
-
+            
             # Cache by domain
             cursor.execute("SELECT domain, COUNT(*) FROM page_cache GROUP BY domain ORDER BY COUNT(*) DESC LIMIT 10")
             cache_by_domain = cursor.fetchall()
-
+            
             # Recent cache activity
             cursor.execute("""
                 SELECT COUNT(*) FROM page_cache
@@ -575,15 +571,15 @@ def get_cache_statistics():
             cursor.execute("SELECT AVG(analysis_count) FROM page_cache")
             avg_reuse = cursor.fetchone()[0] or 0
 
-            return jsonify({
-                'cache_statistics': {
-                    'total_cached_pages': total_cached,
-                    'recent_access_24h': recent_access,
-                    'average_reuse_count': round(avg_reuse, 2),
-                    'top_domains': [{'domain': domain, 'pages': count} for domain, count in cache_by_domain],
-                    'cache_efficiency': round((recent_access / max(total_cached, 1)) * 100, 1)
-                }
-            })
+        return jsonify({
+            'cache_statistics': {
+                'total_cached_pages': total_cached,
+                'recent_access_24h': recent_access,
+                'average_reuse_count': round(avg_reuse, 2),
+                'top_domains': [{'domain': domain, 'pages': count} for domain, count in cache_by_domain],
+                'cache_efficiency': round((recent_access / max(total_cached, 1)) * 100, 1)
+            }
+        })
 
     except Exception as e:
         logger.error(f"Error getting cache statistics: {e}")
@@ -602,7 +598,6 @@ def clear_cache():
             # Clear cache
             cursor.execute("DELETE FROM page_cache")
             cursor.execute("DELETE FROM analysis_sessions")
-
             cursor.execute("SELECT COUNT(*) FROM page_cache")
             after_count = cursor.fetchone()[0]
 
