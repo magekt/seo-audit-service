@@ -1,6 +1,6 @@
 """
 Enhanced SEO Audit Tool - Flask Application V3.0
-Production-ready web application with advanced features
+Production-ready web application with FUNCTIONAL advanced features
 """
 
 import os
@@ -127,13 +127,13 @@ class ProgressTracker:
         }
 
 class EnhancedAnalysisManager:
-    """Enhanced analysis manager with new features"""
+    """Enhanced analysis manager with FUNCTIONAL features"""
     def __init__(self):
         self.active_analyses = {}
 
     def start_enhanced_analysis(self, analysis_id: str, website_url: str, target_keyword: str,
                               max_pages: int, whole_website: bool = False):
-        """Start enhanced SEO analysis with new features"""
+        """Start enhanced SEO analysis with FUNCTIONAL features"""
         def run_enhanced_analysis():
             try:
                 time.sleep(0.5)  # Initial delay
@@ -157,12 +157,13 @@ class EnhancedAnalysisManager:
                     analyses[analysis_id]['status'] = 'running'
                     analyses[analysis_id]['progress'] = 'Initializing enhanced SEO analysis with advanced features...'
 
-                logger.info(f"Starting enhanced analysis {analysis_id} for {website_url}")
+                logger.info(f"Starting enhanced analysis {analysis_id} for {website_url} (whole_website: {whole_website})")
 
-                # Enhanced progress tracking
+                # IMPROVED: Dynamic progress tracking based on analysis type
+                total_steps = 10 if whole_website else 6
                 progress_tracker = ProgressTracker(
-                    total_steps=7 if whole_website else 5,
-                    description=f"Enhanced SEO Analysis for {website_url}"
+                    total_steps=total_steps,
+                    description=f"{'Whole Website' if whole_website else 'Selective'} SEO Analysis for {website_url}"
                 )
                 
                 with analyses_lock:
@@ -176,25 +177,32 @@ class EnhancedAnalysisManager:
                 if not utils.validate_url(website_url):
                     raise ValueError("Invalid website URL format")
 
-                # Step 2: Enhanced Analysis with new features
+                # Step 2: URL Discovery (for whole website)
+                if whole_website:
+                    progress_tracker.increment("Discovering all website URLs")
+                    with analyses_lock:
+                        analyses[analysis_id]['progress'] = "Discovering all URLs on the website..."
+
+                # Step 3: Enhanced Analysis with new features
                 progress_tracker.increment("Running enhanced SEO analysis with SERP and caching")
                 with analyses_lock:
-                    analyses[analysis_id]['progress'] = progress_tracker.get_status()['step_description']
+                    analyses[analysis_id]['progress'] = f"Analyzing website ({'whole site' if whole_website else f'up to {max_pages} pages'})..."
 
-                # Call enhanced SEO engine
+                # FIXED: Force disable cache for fresh analysis
                 result = seo_engine.analyze_website(
                     website_url,
                     target_keyword,
                     max_pages,
-                    whole_website=whole_website
+                    whole_website=whole_website,
+                    force_fresh=True  # Force fresh analysis
                 )
 
-                # Step 3: Enhanced Processing
+                # Step 4: Enhanced Processing
                 progress_tracker.increment("Processing enhanced analysis results and generating insights")
                 with analyses_lock:
                     analyses[analysis_id]['progress'] = progress_tracker.get_status()['step_description']
 
-                # Step 4: Enhanced Report Generation
+                # Step 5: Report Generation
                 progress_tracker.increment("Generating comprehensive enhanced reports and CSV export")
                 with analyses_lock:
                     analyses[analysis_id]['progress'] = progress_tracker.get_status()['step_description']
@@ -210,13 +218,16 @@ class EnhancedAnalysisManager:
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(result['report'])
 
-                # Step 5: Finalization
+                # Step 6: Finalization
                 progress_tracker.increment("Finalizing enhanced analysis and preparing exports")
 
                 # Enhanced completion data
+                pages_analyzed = result['metadata'].get('pages_analyzed', 0)
+                analysis_type = 'Whole Website' if whole_website else 'Selective'
+                
                 final_update = {
                     'status': 'completed',
-                    'progress': 'Enhanced SEO analysis completed successfully! 🎉',
+                    'progress': f'🎉 Enhanced SEO analysis completed successfully! Analyzed {pages_analyzed} pages.',
                     'report': result['report'],
                     'metadata': result['metadata'],
                     'filename': filename,
@@ -227,8 +238,10 @@ class EnhancedAnalysisManager:
                     'duration': progress_tracker.get_status()['elapsed_time'],
                     'enhanced_features_used': {
                         'whole_website': whole_website,
+                        'analysis_type': analysis_type,
                         'serp_analysis': result['metadata'].get('serp_results_count', 0) > 0,
                         'cached_pages': result['metadata'].get('cached_pages', 0),
+                        'fresh_pages': pages_analyzed - result['metadata'].get('cached_pages', 0),
                         'total_data_transferred': result['metadata'].get('total_data_transferred', 0)
                     }
                 }
@@ -236,7 +249,8 @@ class EnhancedAnalysisManager:
                 with analyses_lock:
                     analyses[analysis_id].update(final_update)
 
-                logger.info(f"✅ Enhanced analysis {analysis_id} completed in {utils.format_duration(progress_tracker.get_status()['elapsed_time'])}")
+                logger.info(f"✅ Enhanced analysis {analysis_id} completed successfully! "
+                          f"Analyzed {pages_analyzed} pages in {utils.format_duration(progress_tracker.get_status()['elapsed_time'])}")
 
             except Exception as e:
                 error_msg = str(e)
@@ -271,7 +285,7 @@ def index():
 
 @app.route('/api/analyze', methods=['POST'])
 def start_analysis_endpoint():
-    """Enhanced SEO analysis endpoint with new features"""
+    """Enhanced SEO analysis endpoint with FUNCTIONAL features"""
     try:
         # Rate limiting check
         if not rate_limiter.is_allowed():
@@ -309,11 +323,13 @@ def start_analysis_endpoint():
         except Exception as e:
             return jsonify({'error': f'Invalid website URL: {str(e)}'}), 400
 
-        # Adjust limits for whole website analysis
+        # IMPROVED: Better limits for whole website analysis
         if whole_website:
-            max_pages = min(max_pages, 1000)  # Safety limit
+            max_pages = min(max_pages, 500)  # Increased limit for whole website
+            logger.info(f"Whole website analysis requested for {website_url} (limit: {max_pages} pages)")
         else:
             max_pages = min(max(1, max_pages), config.max_pages_limit)
+            logger.info(f"Selective analysis requested for {website_url} ({max_pages} pages)")
 
         # Generate enhanced analysis ID
         analysis_id = str(uuid.uuid4())
@@ -328,12 +344,13 @@ def start_analysis_endpoint():
             'serp_analysis': serp_analysis,
             'use_cache': use_cache,
             'status': 'queued',
-            'progress': 'Enhanced analysis queued for processing...',
+            'progress': f'Enhanced {"whole website" if whole_website else "selective"} analysis queued for processing...',
             'started_at': datetime.now().isoformat(),
             'user_agent': request.headers.get('User-Agent', ''),
             'client_ip': request.remote_addr,
             'created_at': datetime.now().isoformat(),
-            'enhanced_features': True
+            'enhanced_features': True,
+            'analysis_type': 'whole_website' if whole_website else 'selective'
         }
 
         with analyses_lock:
@@ -347,19 +364,23 @@ def start_analysis_endpoint():
         )
 
         logger.info(f"Started enhanced analysis {analysis_id} for {website_url} "
-                   f"(keyword: {target_keyword}, whole_website: {whole_website})")
+                   f"(keyword: {target_keyword}, whole_website: {whole_website}, max_pages: {max_pages})")
 
+        # IMPROVED: Better estimated duration
+        estimated_duration = 300 if whole_website else (max_pages * 5)  # 5 minutes for whole site minimum
+        
         return jsonify({
             'analysis_id': analysis_id,
             'status': 'started',
-            'message': 'Enhanced SEO analysis started successfully',
+            'message': f'Enhanced {"whole website" if whole_website else "selective"} SEO analysis started successfully',
             'check_status_url': url_for('check_status', analysis_id=analysis_id),
-            'estimated_duration_seconds': (max_pages * 5) if not whole_website else 1800,  # 30 min for whole site
+            'estimated_duration_seconds': estimated_duration,
             'max_pages': max_pages,
             'whole_website': whole_website,
             'enhanced_features': True,
             'serp_analysis_enabled': serp_analysis,
-            'caching_enabled': use_cache
+            'caching_enabled': use_cache,
+            'analysis_type': 'whole_website' if whole_website else 'selective'
         }), 202
 
     except Exception as e:
@@ -396,11 +417,14 @@ def check_status(analysis_id):
 
         # Enhanced metadata for completed analysis
         if analysis.get('status') == 'completed' and 'enhanced_features_used' in analysis:
+            features = analysis['enhanced_features_used']
             analysis['enhanced_summary'] = {
-                'whole_website_analysis': analysis['enhanced_features_used'].get('whole_website', False),
-                'serp_results_found': analysis['enhanced_features_used'].get('serp_analysis', False),
-                'pages_from_cache': analysis['enhanced_features_used'].get('cached_pages', 0),
-                'data_transferred_mb': analysis['enhanced_features_used'].get('total_data_transferred', 0) / 1024 / 1024,
+                'analysis_type': features.get('analysis_type', 'selective'),
+                'whole_website_analysis': features.get('whole_website', False),
+                'serp_results_found': features.get('serp_analysis', False),
+                'pages_from_cache': features.get('cached_pages', 0),
+                'fresh_pages_analyzed': features.get('fresh_pages', 0),
+                'data_transferred_mb': features.get('total_data_transferred', 0) / 1024 / 1024,
                 'has_csv_export': bool(analysis.get('csv_data_path'))
             }
 
@@ -505,7 +529,7 @@ def health_check():
         health_status = {
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
-            'version': '3.0-enhanced',
+            'version': '3.0-enhanced-functional',
             'enhanced_features': True
         }
 
@@ -515,7 +539,8 @@ def health_check():
             'total_analyses': len(analyses),
             'cache_enabled': True,
             'serp_analysis': config.serp_analysis_enabled,
-            'rate_limiting': True
+            'rate_limiting': True,
+            'whole_website_support': True
         }
 
         # Cache health check
@@ -631,9 +656,9 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
 
-    logger.info(f"🚀 Starting Enhanced SEO Audit Tool V3.0 on port {port}")
+    logger.info(f"🚀 Starting Enhanced SEO Audit Tool V3.0 FUNCTIONAL on port {port}")
     logger.info(f"🔧 Debug mode: {debug}")
-    logger.info(f"📊 Enhanced features: SERP analysis, Smart caching, Whole website analysis")
+    logger.info(f"📊 Enhanced features: SERP analysis, Smart caching, FUNCTIONAL Whole website analysis")
 
     app.run(host='0.0.0.0', port=port, debug=debug)
 
