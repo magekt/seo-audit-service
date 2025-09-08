@@ -2,7 +2,6 @@ import os
 import json
 import sqlite3
 import asyncio
-import aiohttp
 import logging
 import uuid
 from datetime import datetime, timedelta
@@ -17,8 +16,8 @@ from flask import Flask, render_template, request, jsonify, send_file, session
 from werkzeug.exceptions import BadRequest, NotFound
 import pandas as pd
 
-# FIXED IMPORTS:
-from seo_engine import EnhancedSEOEngine  # Changed from EnhancedSEOAnalyzer
+# FIXED IMPORTS - Using correct class names and functions
+from seo_engine import EnhancedSEOEngine  # Fixed: was EnhancedSEOAnalyzer
 from utils import (
     sanitize_filename, validate_url, setup_directories,
     format_elapsed_time, get_client_ip, rate_limit_check,
@@ -29,8 +28,33 @@ from utils import (
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'seo-audit-secret-key-change-in-production')
 
-# Load configuration
-config = load_config()
+# Load configuration - Fixed to handle the actual config structure
+try:
+    config_obj = load_config()
+    # Convert config object to dictionary for easier access
+    config = {
+        'max_concurrent_requests': getattr(config_obj, 'max_concurrent_requests', 5),
+        'request_timeout': getattr(config_obj, 'request_timeout', 30),
+        'cache_enabled': getattr(config_obj, 'cache_enabled', True),
+        'serp_analysis_enabled': getattr(config_obj, 'serp_analysis_enabled', True),
+        'rate_limit_requests': getattr(config_obj, 'rate_limit_requests', 10),
+        'rate_limit_window': getattr(config_obj, 'rate_limit_window', 60),
+        'max_pages_limit': getattr(config_obj, 'max_pages_limit', 50),
+        'whole_website_max_pages': getattr(config_obj, 'whole_website_max_pages', 500),
+    }
+except Exception as e:
+    # Fallback configuration if loading fails
+    config = {
+        'max_concurrent_requests': 5,
+        'request_timeout': 30,
+        'cache_enabled': True,
+        'serp_analysis_enabled': True,
+        'rate_limit_requests': 10,
+        'rate_limit_window': 60,
+        'max_pages_limit': 50,
+        'whole_website_max_pages': 500,
+    }
+
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -44,46 +68,46 @@ def init_db():
         os.makedirs('cache', exist_ok=True)
         conn = sqlite3.connect('cache/seo_analysis.db')
         cursor = conn.cursor()
-        
+
         # Analysis tracking table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS analysis_sessions (
-                id TEXT PRIMARY KEY,
-                website_url TEXT NOT NULL,
-                target_keyword TEXT,
-                analysis_type TEXT NOT NULL,
-                status TEXT DEFAULT 'running',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                completed_at TIMESTAMP,
-                client_ip TEXT,
-                result_data TEXT,
-                csv_file_path TEXT,
-                error_message TEXT,
-                pages_analyzed INTEGER DEFAULT 0,
-                total_pages INTEGER DEFAULT 0,
-                enhanced_features TEXT
-            )
-        ''')
-        
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_sessions (
+            id TEXT PRIMARY KEY,
+            website_url TEXT NOT NULL,
+            target_keyword TEXT,
+            analysis_type TEXT NOT NULL,
+            status TEXT DEFAULT 'running',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP,
+            client_ip TEXT,
+            result_data TEXT,
+            csv_file_path TEXT,
+            error_message TEXT,
+            pages_analyzed INTEGER DEFAULT 0,
+            total_pages INTEGER DEFAULT 0,
+            enhanced_features TEXT
+        )
+        """)
+
         # Cache table for individual page data
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS page_cache (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT NOT NULL,
-                url_hash TEXT UNIQUE NOT NULL,
-                analysis_data TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                access_count INTEGER DEFAULT 1
-            )
-        ''')
-        
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS page_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            url_hash TEXT UNIQUE NOT NULL,
+            analysis_data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            access_count INTEGER DEFAULT 1
+        )
+        """)
+
         # Create indexes for better performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_url ON analysis_sessions(website_url)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_status ON analysis_sessions(status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cache_hash ON page_cache(url_hash)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cache_created ON page_cache(created_at)')
-        
+
         conn.commit()
         conn.close()
         logger.info("Database initialized successfully")
@@ -95,10 +119,14 @@ def init_db():
 active_analyses = {}
 analysis_lock = threading.Lock()
 
-@app.before_first_request
-def initialize():
-    """Initialize application before first request"""
-    init_db()
+# FIXED: Replace deprecated @app.before_first_request with @app.before_request
+@app.before_request
+def initialize_once():
+    """Initialize application before first request - FIXED deprecated decorator"""
+    # Only initialize once
+    if not hasattr(initialize_once, 'initialized'):
+        init_db()
+        initialize_once.initialized = True
 
 @app.route('/')
 def index():
@@ -116,16 +144,16 @@ def get_recent_analyses(limit=10):
     try:
         conn = sqlite3.connect('cache/seo_analysis.db')
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT id, website_url, target_keyword, analysis_type, status, 
-                   created_at, completed_at, pages_analyzed, total_pages
-            FROM analysis_sessions 
-            WHERE status = 'completed'
-            ORDER BY created_at DESC 
-            LIMIT ?
-        ''', (limit,))
-        
+
+        cursor.execute("""
+        SELECT id, website_url, target_keyword, analysis_type, status, 
+               created_at, completed_at, pages_analyzed, total_pages
+        FROM analysis_sessions 
+        WHERE status = 'completed'
+        ORDER BY created_at DESC 
+        LIMIT ?
+        """, (limit,))
+
         analyses = []
         for row in cursor.fetchall():
             analysis = {
@@ -140,7 +168,7 @@ def get_recent_analyses(limit=10):
                 'total_pages': row[8]
             }
             analyses.append(analysis)
-        
+
         conn.close()
         return analyses
     except Exception as e:
@@ -153,7 +181,7 @@ def start_analysis():
     try:
         # Rate limiting check
         client_ip = get_client_ip(request)
-        if not rate_limit_check(client_ip):
+        if not rate_limit_check(client_ip, limit=config.get('rate_limit_requests', 10)):
             return jsonify({
                 'error': 'Rate limit exceeded',
                 'message': 'Please wait before starting another analysis'
@@ -179,16 +207,16 @@ def start_analysis():
         # Check if analysis already exists and is running
         with analysis_lock:
             analysis_id = str(uuid.uuid4())
-            
+
             # Store analysis info
             conn = sqlite3.connect('cache/seo_analysis.db')
             cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO analysis_sessions 
-                (id, website_url, target_keyword, analysis_type, client_ip, total_pages)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
+
+            cursor.execute("""
+            INSERT INTO analysis_sessions 
+            (id, website_url, target_keyword, analysis_type, client_ip, total_pages)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
                 analysis_id, website_url, target_keyword,
                 'whole_website' if whole_website else 'selective',
                 client_ip, max_pages
@@ -207,7 +235,7 @@ def start_analysis():
                 'use_cache': use_cache,
                 'client_ip': client_ip
             }
-            
+
             active_analyses[analysis_id] = {
                 'status': 'running',
                 'progress': 0,
@@ -216,19 +244,19 @@ def start_analysis():
                 'config': analysis_config
             }
 
-        # Start analysis in background thread
-        executor = ThreadPoolExecutor(max_workers=1)
-        executor.submit(run_analysis_background, analysis_config)
+            # Start analysis in background thread
+            executor = ThreadPoolExecutor(max_workers=1)
+            executor.submit(run_analysis_background, analysis_config)
 
-        return jsonify({
-            'analysis_id': analysis_id,
-            'status': 'started',
-            'message': 'Analysis started successfully',
-            'check_status_url': f'/api/status/{analysis_id}',
-            'analysis_type': 'whole_website' if whole_website else 'selective',
-            'enhanced_features': True,
-            'caching_enabled': use_cache
-        })
+            return jsonify({
+                'analysis_id': analysis_id,
+                'status': 'started',
+                'message': 'Analysis started successfully',
+                'check_status_url': f'/api/status/{analysis_id}',
+                'analysis_type': 'whole_website' if whole_website else 'selective',
+                'enhanced_features': True,
+                'caching_enabled': use_cache
+            })
 
     except Exception as e:
         logger.error(f"Error starting analysis: {str(e)}")
@@ -237,92 +265,99 @@ def start_analysis():
             'message': str(e)
         }), 500
 
-def run_analysis_background(config):
-    """Run analysis in background thread"""
-    analysis_id = config['analysis_id']
-    
+def run_analysis_background(analysis_config):
+    """Run analysis in background thread - FIXED all method calls"""
+    analysis_id = analysis_config['analysis_id']
+
     try:
         logger.info(f"Starting background analysis {analysis_id}")
-        
+
         # Update status
         active_analyses[analysis_id]['status'] = 'running'
         active_analyses[analysis_id]['message'] = 'Initializing analyzer...'
-        
-        # Initialize analyzer
-        analyzer = EnhancedSEOAnalyzer(
-            max_concurrent_requests=config.get('max_concurrent_requests', 5),
-            request_timeout=config.get('request_timeout', 30),
-            use_cache=config['use_cache']
-        )
-        
-        # Run analysis
-        active_analyses[analysis_id]['message'] = 'Running analysis...'
-        
-        if config['whole_website']:
-            results = asyncio.run(analyzer.analyze_whole_website(
-                config['website_url'],
-                config['target_keyword'],
-                max_pages=config['max_pages'],
-                serp_analysis=config['serp_analysis'],
-                progress_callback=lambda p, m: update_analysis_progress(analysis_id, p, m)
-            ))
-        else:
-            results = asyncio.run(analyzer.analyze_website_selective(
-                config['website_url'],
-                config['target_keyword'],
-                max_pages=config['max_pages'],
-                serp_analysis=config['serp_analysis'],
-                progress_callback=lambda p, m: update_analysis_progress(analysis_id, p, m)
-            ))
 
-        # Generate CSV export
+        # FIXED: Initialize the correct analyzer with proper parameters
+        analyzer = EnhancedSEOEngine(config_obj)  # Use the config object
+
+        # Run analysis - FIXED: Use the correct method names and parameters
+        active_analyses[analysis_id]['message'] = 'Running analysis...'
+
+        # FIXED: Call the correct analyze_website method with proper parameters
+        results = analyzer.analyze_website(
+            website_url=analysis_config['website_url'],
+            target_keyword=analysis_config['target_keyword'],
+            max_pages=analysis_config['max_pages'],
+            whole_website=analysis_config['whole_website'],
+            force_fresh=not analysis_config['use_cache']
+        )
+
+        # FIXED: Handle the results structure properly
+        if isinstance(results, dict) and 'pages_data' in results:
+            pages_data = results['pages_data']
+            report_data = results.get('report', '')
+            metadata = results.get('metadata', {})
+        else:
+            # Fallback for different result structure
+            pages_data = results if isinstance(results, list) else []
+            report_data = ''
+            metadata = {}
+
+        # Generate CSV export - FIXED: Handle the proper data structure
         active_analyses[analysis_id]['message'] = 'Generating reports...'
-        csv_path = generate_csv_report(results, analysis_id)
-        
+        csv_path = generate_csv_report_fixed(pages_data, analysis_id)
+
         # Update database with results
         conn = sqlite3.connect('cache/seo_analysis.db')
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            UPDATE analysis_sessions 
-            SET status = 'completed', completed_at = CURRENT_TIMESTAMP, 
-                result_data = ?, csv_file_path = ?, pages_analyzed = ?
-            WHERE id = ?
-        ''', (
-            json.dumps(results, default=str),
+
+        # FIXED: Store results properly
+        result_data = {
+            'pages': [page.__dict__ if hasattr(page, '__dict__') else page for page in pages_data],
+            'report': report_data,
+            'metadata': metadata,
+            'analysis_type': 'whole_website' if analysis_config['whole_website'] else 'selective'
+        }
+
+        cursor.execute("""
+        UPDATE analysis_sessions 
+        SET status = 'completed', completed_at = CURRENT_TIMESTAMP, 
+            result_data = ?, csv_file_path = ?, pages_analyzed = ?
+        WHERE id = ?
+        """, (
+            json.dumps(result_data, default=str),
             csv_path,
-            len(results.get('pages', [])),
+            len(pages_data),
             analysis_id
         ))
         conn.commit()
         conn.close()
-        
+
         # Update active analysis
         active_analyses[analysis_id].update({
             'status': 'completed',
             'progress': 100,
             'message': 'Analysis completed successfully',
             'completed_at': datetime.now(),
-            'results': results,
+            'results': result_data,
             'csv_path': csv_path
         })
-        
+
         logger.info(f"Analysis {analysis_id} completed successfully")
-        
+
     except Exception as e:
         logger.error(f"Analysis {analysis_id} failed: {str(e)}")
-        
+
         # Update database with error
         conn = sqlite3.connect('cache/seo_analysis.db')
         cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE analysis_sessions 
-            SET status = 'failed', error_message = ?
-            WHERE id = ?
-        ''', (str(e), analysis_id))
+        cursor.execute("""
+        UPDATE analysis_sessions 
+        SET status = 'failed', error_message = ?
+        WHERE id = ?
+        """, (str(e), analysis_id))
         conn.commit()
         conn.close()
-        
+
         # Update active analysis
         active_analyses[analysis_id].update({
             'status': 'failed',
@@ -330,23 +365,87 @@ def run_analysis_background(config):
             'error': str(e)
         })
 
-def update_analysis_progress(analysis_id, progress, message):
-    """Update analysis progress"""
-    if analysis_id in active_analyses:
-        active_analyses[analysis_id].update({
-            'progress': progress,
-            'message': message
-        })
+def generate_csv_report_fixed(pages_data, analysis_id):
+    """Generate CSV report from analysis results - FIXED to handle actual data structure"""
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"seo_comprehensive_analysis_{timestamp}.csv"
+        filepath = os.path.join('exports', filename)
+
+        # Ensure exports directory exists
+        os.makedirs('exports', exist_ok=True)
+
+        # FIXED: Handle the actual SEOPageData structure
+        csv_data = []
+        for page in pages_data:
+            try:
+                # Handle both object and dictionary formats
+                if hasattr(page, '__dict__'):
+                    # Object format (SEOPageData)
+                    row = {
+                        'URL': getattr(page, 'url', ''),
+                        'Title': getattr(page, 'title', ''),
+                        'Meta_Description': getattr(page, 'meta_description', ''),
+                        'H1_Count': len(getattr(page, 'h1_tags', [])),
+                        'Status_Code': getattr(page, 'status_code', ''),
+                        'Word_Count': getattr(page, 'word_count', 0),
+                        'Load_Time': getattr(page, 'load_time', 0),
+                        'SEO_Issues_Count': len(getattr(page, 'seo_issues', [])),
+                        'Keyword_Density': getattr(page, 'keyword_density', 0),
+                        'Internal_Links': len(getattr(page, 'internal_links', [])),
+                        'External_Links': len(getattr(page, 'external_links', [])),
+                        'Images_Count': len(getattr(page, 'images', [])),
+                        'Mobile_Friendly': getattr(page, 'mobile_friendly', False),
+                        'HTTPS_Enabled': getattr(page, 'ssl_enabled', False),
+                        'All_Issues': '; '.join(getattr(page, 'seo_issues', []))
+                    }
+                else:
+                    # Dictionary format
+                    row = {
+                        'URL': page.get('url', ''),
+                        'Title': page.get('title', ''),
+                        'Meta_Description': page.get('meta_description', ''),
+                        'H1_Count': len(page.get('h1_tags', [])),
+                        'Status_Code': page.get('status_code', ''),
+                        'Word_Count': page.get('word_count', 0),
+                        'Load_Time': page.get('load_time', 0),
+                        'SEO_Issues_Count': len(page.get('seo_issues', [])),
+                        'Keyword_Density': page.get('keyword_density', 0),
+                        'Internal_Links': len(page.get('internal_links', [])),
+                        'External_Links': len(page.get('external_links', [])),
+                        'Images_Count': len(page.get('images', [])),
+                        'Mobile_Friendly': page.get('mobile_friendly', False),
+                        'HTTPS_Enabled': page.get('ssl_enabled', False),
+                        'All_Issues': '; '.join(page.get('seo_issues', []))
+                    }
+                csv_data.append(row)
+            except Exception as e:
+                logger.warning(f"Error processing page data for CSV: {e}")
+                continue
+
+        # Create DataFrame and save CSV
+        if csv_data:
+            df = pd.DataFrame(csv_data)
+            df.to_csv(filepath, index=False, encoding='utf-8')
+            logger.info(f"CSV report generated: {filepath}")
+            return filepath
+        else:
+            logger.warning("No data to export to CSV")
+            return None
+
+    except Exception as e:
+        logger.error(f"Error generating CSV report: {str(e)}")
+        return None
 
 @app.route('/api/status/<analysis_id>')
 def get_analysis_status(analysis_id):
-    """Get analysis status"""
+    """Get analysis status - FIXED route parameter"""
     try:
         # Check active analyses first
         if analysis_id in active_analyses:
             analysis = active_analyses[analysis_id]
             elapsed = datetime.now() - analysis['created_at']
-            
+
             return jsonify({
                 'analysis_id': analysis_id,
                 'status': analysis['status'],
@@ -359,27 +458,27 @@ def get_analysis_status(analysis_id):
                 'client_ip': analysis['config'].get('client_ip', ''),
                 'pages_analyzed': analysis.get('pages_analyzed', 0)
             })
-        
+
         # Check database for completed analyses
         conn = sqlite3.connect('cache/seo_analysis.db')
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT status, created_at, completed_at, pages_analyzed, 
-                   total_pages, analysis_type, client_ip, error_message
-            FROM analysis_sessions WHERE id = ?
-        ''', (analysis_id,))
-        
+
+        cursor.execute("""
+        SELECT status, created_at, completed_at, pages_analyzed, 
+               total_pages, analysis_type, client_ip, error_message
+        FROM analysis_sessions WHERE id = ?
+        """, (analysis_id,))
+
         row = cursor.fetchone()
         conn.close()
-        
+
         if not row:
             return jsonify({'error': 'Analysis not found'}), 404
-            
+
         created_at = datetime.fromisoformat(row[1])
         completed_at = datetime.fromisoformat(row[2]) if row[2] else None
         elapsed = (completed_at or datetime.now()) - created_at
-        
+
         return jsonify({
             'analysis_id': analysis_id,
             'status': row[0],
@@ -393,14 +492,14 @@ def get_analysis_status(analysis_id):
             'elapsed_formatted': format_elapsed_time(elapsed.total_seconds()),
             'error_message': row[7]
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting analysis status: {str(e)}")
         return jsonify({'error': 'Failed to get analysis status'}), 500
 
 @app.route('/api/report/<analysis_id>')
 def get_analysis_report(analysis_id):
-    """Get analysis report"""
+    """Get analysis report - FIXED route parameter"""
     try:
         # Check active analyses first
         if analysis_id in active_analyses and 'results' in active_analyses[analysis_id]:
@@ -416,27 +515,27 @@ def get_analysis_report(analysis_id):
                     'csv_path': active_analyses[analysis_id].get('csv_path')
                 }
             })
-        
+
         # Check database
         conn = sqlite3.connect('cache/seo_analysis.db')
         cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT result_data, completed_at, csv_file_path, status 
-            FROM analysis_sessions WHERE id = ?
-        ''', (analysis_id,))
-        
+
+        cursor.execute("""
+        SELECT result_data, completed_at, csv_file_path, status 
+        FROM analysis_sessions WHERE id = ?
+        """, (analysis_id,))
+
         row = cursor.fetchone()
         conn.close()
-        
+
         if not row:
             return jsonify({'error': 'Analysis not found'}), 404
-            
+
         if row[3] != 'completed':
             return jsonify({'error': 'Analysis not completed yet'}), 400
-            
+
         results = json.loads(row[0]) if row[0] else {}
-        
+
         return jsonify({
             'analysis_id': analysis_id,
             'status': 'completed',
@@ -452,7 +551,7 @@ def get_analysis_report(analysis_id):
                 'analysis_type': results.get('analysis_type', 'unknown')
             }
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting analysis report: {str(e)}")
         return jsonify({'error': 'Failed to get analysis report'}), 500
@@ -470,92 +569,53 @@ def get_recent_analyses_api():
 
 @app.route('/api/cancel/<analysis_id>', methods=['POST'])
 def cancel_analysis(analysis_id):
-    """Cancel running analysis"""
+    """Cancel running analysis - FIXED route parameter"""
     try:
         if analysis_id in active_analyses:
             active_analyses[analysis_id]['status'] = 'cancelled'
             active_analyses[analysis_id]['message'] = 'Analysis cancelled by user'
-            
+
             # Update database
             conn = sqlite3.connect('cache/seo_analysis.db')
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE analysis_sessions 
-                SET status = 'cancelled' 
-                WHERE id = ?
-            ''', (analysis_id,))
+            cursor.execute("""
+            UPDATE analysis_sessions 
+            SET status = 'cancelled' 
+            WHERE id = ?
+            """, (analysis_id,))
             conn.commit()
             conn.close()
-            
+
             return jsonify({'message': 'Analysis cancelled successfully'})
         else:
             return jsonify({'error': 'Analysis not found or already completed'}), 404
-            
+
     except Exception as e:
         logger.error(f"Error cancelling analysis: {str(e)}")
         return jsonify({'error': 'Failed to cancel analysis'}), 500
 
-def generate_csv_report(results, analysis_id):
-    """Generate CSV report from analysis results"""
-    try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"seo_comprehensive_analysis_{timestamp}.csv"
-        filepath = os.path.join('exports', filename)
-        
-        # Prepare data for CSV
-        pages_data = []
-        for page in results.get('pages', []):
-            row = {
-                'URL': page.get('url', ''),
-                'Title': page.get('title', ''),
-                'Meta Description': page.get('meta_description', ''),
-                'H1': page.get('h1', ''),
-                'Status Code': page.get('status_code', ''),
-                'Word Count': page.get('word_count', 0),
-                'Load Time': page.get('load_time', 0),
-                'SEO Score': page.get('seo_score', 0),
-                'Issues': ', '.join(page.get('issues', [])),
-                'Target Keyword Density': page.get('target_keyword_density', 0),
-                'Internal Links': len(page.get('internal_links', [])),
-                'External Links': len(page.get('external_links', [])),
-                'Images': len(page.get('images', [])),
-                'Images Missing Alt': len([img for img in page.get('images', []) if not img.get('alt')])
-            }
-            pages_data.append(row)
-        
-        # Create DataFrame and save CSV
-        df = pd.DataFrame(pages_data)
-        df.to_csv(filepath, index=False, encoding='utf-8')
-        
-        logger.info(f"CSV report generated: {filepath}")
-        return filepath
-        
-    except Exception as e:
-        logger.error(f"Error generating CSV report: {str(e)}")
-        return None
-
 @app.route('/api/download-csv/<analysis_id>')
 def download_csv(analysis_id):
-    """Download CSV report"""
+    """Download CSV report - FIXED route parameter"""
     try:
         # Check active analyses first
         if analysis_id in active_analyses and 'csv_path' in active_analyses[analysis_id]:
             csv_path = active_analyses[analysis_id]['csv_path']
             if csv_path and os.path.exists(csv_path):
                 return send_file(csv_path, as_attachment=True)
-        
+
         # Check database
         conn = sqlite3.connect('cache/seo_analysis.db')
         cursor = conn.cursor()
         cursor.execute('SELECT csv_file_path FROM analysis_sessions WHERE id = ?', (analysis_id,))
         row = cursor.fetchone()
         conn.close()
-        
+
         if row and row[0] and os.path.exists(row[0]):
             return send_file(row[0], as_attachment=True)
         else:
             return jsonify({'error': 'CSV file not found'}), 404
-            
+
     except Exception as e:
         logger.error(f"Error downloading CSV: {str(e)}")
         return jsonify({'error': 'Failed to download CSV'}), 500
@@ -569,14 +629,14 @@ def health_check():
         cursor = conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM analysis_sessions')
         total_analyses = cursor.fetchone()[0]
-        
+
         cursor.execute('SELECT COUNT(*) FROM page_cache')
         cached_pages = cursor.fetchone()[0]
         conn.close()
-        
+
         # Check active analyses
         active_count = len([a for a in active_analyses.values() if a['status'] == 'running'])
-        
+
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
@@ -592,7 +652,7 @@ def health_check():
                 }
             }
         })
-        
+
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return jsonify({
@@ -610,11 +670,15 @@ def not_found(error):
 def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
+# FIXED: Ensure proper Flask app object for Gunicorn
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_ENV') == 'development'
-    
+
     logger.info(f"Starting Enhanced SEO Audit Tool v3.0 on port {port}")
     logger.info(f"Debug mode: {debug}")
-    
+
     app.run(host='0.0.0.0', port=port, debug=debug, threaded=True)
+
+# Ensure the app object is available for Gunicorn
+application = app  # FIXED: Added for compatibility
