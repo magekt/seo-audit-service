@@ -20,23 +20,23 @@ def validate_url(url: str) -> bool:
     """
     if not url or not isinstance(url, str):
         return False
-    
+
     # Ensure URL has protocol
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
-    
+
     # Use validators library for basic validation
     if not validators.url(url):
         return False
-    
+
     # Parse URL for additional checks
     try:
         parsed = urlparse(url)
-        
+
         # Check for valid domain
         if not parsed.netloc:
             return False
-        
+
         # Check for suspicious patterns
         suspicious_patterns = [
             'localhost',
@@ -46,7 +46,7 @@ def validate_url(url: str) -> bool:
             '10.0.',
             '172.'
         ]
-        
+
         domain = parsed.netloc.lower()
         for pattern in suspicious_patterns:
             if pattern in domain:
@@ -55,9 +55,9 @@ def validate_url(url: str) -> bool:
                 if pattern == 'localhost' and os.getenv('FLASK_ENV') == 'development':
                     continue
                 return False
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"URL validation error: {e}")
         return False
@@ -68,16 +68,16 @@ def normalize_url(url: str) -> str:
     """
     if not url:
         return url
-    
+
     url = url.strip()
-    
+
     # Add protocol if missing
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
-    
+
     try:
         parsed = urlparse(url)
-        
+
         # Normalize the URL
         normalized = urlunparse((
             parsed.scheme.lower(),
@@ -87,9 +87,9 @@ def normalize_url(url: str) -> str:
             parsed.query,
             ''  # Remove fragment
         ))
-        
+
         return normalized
-        
+
     except Exception as e:
         logger.error(f"URL normalization error: {e}")
         return url
@@ -100,26 +100,26 @@ def sanitize_filename(filename: str) -> str:
     """
     if not filename:
         return "unnamed"
-    
+
     # Remove or replace invalid characters
     sanitized = re.sub(r'[<>:"/\\|?*]', '_', filename)
-    
+
     # Remove protocol and www
     sanitized = re.sub(r'^https?://(www\.)?', '', sanitized)
-    
+
     # Replace dots and other characters
     sanitized = re.sub(r'[./]', '_', sanitized)
-    
+
     # Remove multiple underscores
     sanitized = re.sub(r'_+', '_', sanitized)
-    
+
     # Trim and limit length
     sanitized = sanitized.strip('_')[:50]
-    
+
     # Ensure we have something
     if not sanitized:
         sanitized = "unnamed"
-    
+
     return sanitized
 
 def format_duration(seconds: float) -> str:
@@ -143,13 +143,13 @@ def format_file_size(size_bytes: int) -> str:
     """
     if size_bytes == 0:
         return "0 B"
-    
+
     size_names = ["B", "KB", "MB", "GB", "TB"]
     i = 0
     while size_bytes >= 1024 and i < len(size_names) - 1:
         size_bytes /= 1024.0
         i += 1
-    
+
     return f"{size_bytes:.1f} {size_names[i]}"
 
 def extract_domain(url: str) -> str:
@@ -159,11 +159,11 @@ def extract_domain(url: str) -> str:
     try:
         parsed = urlparse(url)
         domain = parsed.netloc.lower()
-        
+
         # Remove www prefix
         if domain.startswith('www.'):
             domain = domain[4:]
-        
+
         return domain
     except:
         return url
@@ -174,17 +174,17 @@ def is_valid_keyword(keyword: str) -> bool:
     """
     if not keyword or not isinstance(keyword, str):
         return False
-    
+
     keyword = keyword.strip()
-    
+
     # Check length
     if len(keyword) < 2 or len(keyword) > 100:
         return False
-    
+
     # Check for basic validity (letters, numbers, spaces, hyphens)
     if not re.match(r'^[a-zA-Z0-9\s\-_]+$', keyword):
         return False
-    
+
     return True
 
 def clean_text(text: str) -> str:
@@ -193,13 +193,13 @@ def clean_text(text: str) -> str:
     """
     if not text:
         return ""
-    
+
     # Remove extra whitespace
     text = re.sub(r'\s+', ' ', text.strip())
-    
+
     # Remove non-printable characters
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f]', '', text)
-    
+
     return text
 
 def calculate_text_similarity(text1: str, text2: str) -> float:
@@ -208,18 +208,18 @@ def calculate_text_similarity(text1: str, text2: str) -> float:
     """
     if not text1 or not text2:
         return 0.0
-    
+
     # Convert to lowercase and split into words
     words1 = set(text1.lower().split())
     words2 = set(text2.lower().split())
-    
+
     # Calculate Jaccard similarity
     intersection = len(words1.intersection(words2))
     union = len(words1.union(words2))
-    
+
     if union == 0:
         return 0.0
-    
+
     return intersection / union
 
 def ensure_directory(directory: str) -> bool:
@@ -242,13 +242,13 @@ def safe_write_file(filepath: str, content: str, encoding: str = 'utf-8') -> boo
         directory = os.path.dirname(filepath)
         if directory:
             ensure_directory(directory)
-        
+
         # Write file
         with open(filepath, 'w', encoding=encoding) as f:
             f.write(content)
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to write file {filepath}: {e}")
         return False
@@ -270,7 +270,7 @@ def get_file_extension(content_type: str) -> str:
         'image/gif': '.gif',
         'image/svg+xml': '.svg'
     }
-    
+
     return content_type_map.get(content_type.lower(), '.txt')
 
 def truncate_text(text: str, max_length: int = 100, suffix: str = '...') -> str:
@@ -279,7 +279,7 @@ def truncate_text(text: str, max_length: int = 100, suffix: str = '...') -> str:
     """
     if not text or len(text) <= max_length:
         return text
-    
+
     return text[:max_length - len(suffix)] + suffix
 
 def parse_robots_txt(content: str) -> Dict[str, Any]:
@@ -292,25 +292,25 @@ def parse_robots_txt(content: str) -> Dict[str, Any]:
         'disallowed_paths': [],
         'allowed_paths': []
     }
-    
+
     if not content:
         return result
-    
+
     current_user_agent = None
-    
+
     for line in content.splitlines():
         line = line.strip()
-        
+
         # Skip comments and empty lines
         if not line or line.startswith('#'):
             continue
-        
+
         # Parse directives
         if ':' in line:
             directive, value = line.split(':', 1)
             directive = directive.strip().lower()
             value = value.strip()
-            
+
             if directive == 'user-agent':
                 current_user_agent = value
             elif directive == 'sitemap':
@@ -324,7 +324,7 @@ def parse_robots_txt(content: str) -> Dict[str, Any]:
                 result['disallowed_paths'].append(value)
             elif directive == 'allow' and value:
                 result['allowed_paths'].append(value)
-    
+
     return result
 
 def is_crawlable_url(url: str, robots_data: Dict[str, Any]) -> bool:
@@ -333,20 +333,20 @@ def is_crawlable_url(url: str, robots_data: Dict[str, Any]) -> bool:
     """
     if not robots_data or not url:
         return True
-    
+
     parsed = urlparse(url)
     path = parsed.path
-    
+
     # Check disallowed paths
     for disallowed in robots_data.get('disallowed_paths', []):
         if path.startswith(disallowed):
             return False
-    
+
     # Check explicitly allowed paths
     for allowed in robots_data.get('allowed_paths', []):
         if path.startswith(allowed):
             return True
-    
+
     return True
 
 def extract_meta_info(html_content: str) -> Dict[str, str]:
@@ -354,42 +354,42 @@ def extract_meta_info(html_content: str) -> Dict[str, str]:
     Extract basic meta information from HTML content
     """
     meta_info = {}
-    
+
     if not html_content:
         return meta_info
-    
+
     try:
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(html_content, 'html.parser')
-        
+
         # Extract title
         title_tag = soup.find('title')
         if title_tag:
             meta_info['title'] = clean_text(title_tag.get_text())
-        
+
         # Extract meta description
         meta_desc = soup.find('meta', attrs={'name': 'description'})
         if meta_desc:
             meta_info['description'] = clean_text(meta_desc.get('content', ''))
-        
+
         # Extract meta keywords
         meta_keywords = soup.find('meta', attrs={'name': 'keywords'})
         if meta_keywords:
             meta_info['keywords'] = clean_text(meta_keywords.get('content', ''))
-        
+
         # Extract canonical URL
         canonical = soup.find('link', rel='canonical')
         if canonical:
             meta_info['canonical'] = canonical.get('href', '')
-        
+
         # Extract language
         html_tag = soup.find('html')
         if html_tag and html_tag.get('lang'):
             meta_info['language'] = html_tag.get('lang')
-        
+
     except Exception as e:
         logger.warning(f"Error extracting meta info: {e}")
-    
+
     return meta_info
 
 def generate_report_filename(url: str, timestamp: str = None) -> str:
@@ -398,7 +398,7 @@ def generate_report_filename(url: str, timestamp: str = None) -> str:
     """
     if not timestamp:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-    
+
     safe_url = sanitize_filename(url)
     return f"seo_audit_{safe_url}_{timestamp}.md"
 
@@ -407,7 +407,7 @@ def validate_analysis_config(config: Dict[str, Any]) -> Dict[str, Any]:
     Validate and sanitize analysis configuration
     """
     validated = {}
-    
+
     # Website URL (required)
     if 'website_url' in config:
         url = config['website_url']
@@ -417,7 +417,7 @@ def validate_analysis_config(config: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("Invalid website URL")
     else:
         raise ValueError("Website URL is required")
-    
+
     # Target keyword (required)
     if 'target_keyword' in config:
         keyword = config['target_keyword']
@@ -427,7 +427,7 @@ def validate_analysis_config(config: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("Invalid target keyword")
     else:
         raise ValueError("Target keyword is required")
-    
+
     # Max pages (optional, with limits)
     max_pages = config.get('max_pages', 10)
     try:
@@ -439,16 +439,16 @@ def validate_analysis_config(config: Dict[str, Any]) -> Dict[str, Any]:
         validated['max_pages'] = max_pages
     except (ValueError, TypeError):
         validated['max_pages'] = 10
-    
+
     # Whole website flag
     validated['whole_website'] = bool(config.get('whole_website', False))
-    
+
     # SERP analysis flag
     validated['serp_analysis'] = bool(config.get('serp_analysis', True))
-    
+
     # Use cache flag
     validated['use_cache'] = bool(config.get('use_cache', True))
-    
+
     return validated
 
 # Error handling utilities
