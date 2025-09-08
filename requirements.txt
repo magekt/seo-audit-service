@@ -1,29 +1,29 @@
-# Enhanced SEO Audit Tool V3.0 - Python 3.11 Compatible Dependencies
-# FIXED for Python 3.13 compatibility issues
+# Enhanced SEO Audit Tool V3.0 - Python 3.13 Emergency Compatibility
+# Last resort if we can't force Python 3.11
 
 # Core Flask Framework
-Flask==2.3.3
+Flask==3.0.0
 Flask-CORS==4.0.0
-Werkzeug==2.3.7
+Werkzeug==3.0.1
 
-# HTTP and Web Scraping
-aiohttp==3.8.6
+# HTTP and Web Scraping (Python 3.13 compatible versions)
+aiohttp==3.9.1
 beautifulsoup4==4.12.2
-lxml==4.9.3
+lxml==5.1.0
 requests==2.31.0
 
 # URL and Data Validation
 validators==0.22.0
 
-# Data Processing and Analysis 
-pandas==2.0.3
-numpy==1.24.4
+# Data Processing and Analysis (avoid problematic pandas/numpy)
+# pandas==2.1.4  # Commented out - causes build issues
+# numpy==1.26.2   # Commented out - causes build issues
 
 # Text Processing and Analysis
 textstat==0.7.3
 
 # URL Processing
-urllib3==2.0.7
+urllib3==2.1.0
 
 # Production WSGI Server
 gunicorn==21.2.0
