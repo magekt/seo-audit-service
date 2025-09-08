@@ -17,7 +17,8 @@ from flask import Flask, render_template, request, jsonify, send_file, session
 from werkzeug.exceptions import BadRequest, NotFound
 import pandas as pd
 
-from seo_engine import EnhancedSEOAnalyzer
+# FIXED IMPORTS:
+from seo_engine import EnhancedSEOEngine  # Changed from EnhancedSEOAnalyzer
 from utils import (
     sanitize_filename, validate_url, setup_directories,
     format_elapsed_time, get_client_ip, rate_limit_check,
