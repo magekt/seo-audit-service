@@ -1,960 +1,735 @@
 /**
-* Start analysis
-*/
-function startAnalysis(formData) {
-   console.log('🔄 Starting analysis with data:', formData);
-   
-   // Update UI state
-   isAnalysisRunning = true;
-   updateSubmitButton(true);
-   showLoading();
-   enableForm(false);
-   hideAlert();
-   hideResults();
-   
-   // Send analysis request
-   fetch('/api/analyze', {
-       method: 'POST',
-       headers: {
-           'Content-Type': 'application/json',
-       },
-       body: JSON.stringify(formData),
-       timeout: CONFIG.API_TIMEOUT
-   })
-   .then(response => {
-       if (!response.ok) {
-           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-       }
-       return response.json();
-   })
-   .then(data => {
-       console.log('✅ Analysis started:', data);
-       
-       if (data.error) {
-           throw new Error(data.error);
-       }
-       
-       currentAnalysisId = data.analysis_id;
-       submitInProgress = false;
-       
-       // Start status checking
-       startStatusChecking();
-       
-       showAlert(`Analysis started successfully! ID: ${data.analysis_id}`, 'success');
-       
-   })
-   .catch(error => {
-       console.error('❌ Analysis start failed:', error);
-       
-       submitInProgress = false;
-       isAnalysisRunning = false;
-       
-       showAlert(`Failed to start analysis: ${error.message}`, 'error');
-       resetAnalysisState();
-   });
+ * Enhanced SEO Audit Tool V3.0 - Complete JavaScript Implementation
+ * Production-ready frontend with progress tracking and error handling
+ */
+
+console.log("🎯 Enhanced SEO Audit Tool V3.0 JavaScript loaded successfully!");
+
+// Configuration and State Management
+const CONFIG = {
+    API_BASE: window.location.origin,
+    STATUS_POLL_INTERVAL: 2000, // Reduced to 2 seconds for better responsiveness
+    MAX_RETRIES: 3,
+    RETRY_DELAY: 2000
+};
+
+const ANALYSIS_STATE = {
+    currentAnalysisId: null,
+    isRunning: false,
+    statusPolling: null,
+    retryCount: 0
+};
+
+// DOM Elements (will be initialized when DOM loads)
+let DOM = {};
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("🚀 Enhanced SEO Audit Tool V3.0 loaded successfully!");
+    initializeDOMElements();
+    setupEventListeners();
+    performHealthCheck();
+    updateUI();
+});
+
+function initializeDOMElements() {
+    DOM = {
+        // Form elements
+        seoForm: document.getElementById('enhanced-seo-form'),
+        websiteUrlInput: document.getElementById('website-url'),
+        targetKeywordInput: document.getElementById('target-keyword'),
+        maxPagesInput: document.getElementById('max-pages'),
+        wholeWebsiteToggle: document.getElementById('whole-website'),
+        serpAnalysisToggle: document.getElementById('serp-analysis'),
+
+        // UI sections
+        formSection: document.getElementById('form-section'),
+        progressSection: document.getElementById('progress-section'),
+        resultsSection: document.getElementById('results-section'),
+
+        // Progress elements
+        progressBar: document.getElementById('progress-bar'),
+        progressFill: document.getElementById('progress-fill'),
+        progressText: document.getElementById('progress-text'),
+        progressDetails: document.getElementById('progress-details'),
+
+        // Results elements
+        reportContent: document.getElementById('report-content'),
+        csvDownloadBtn: document.getElementById('csv-download-btn'),
+
+        // Control buttons
+        startBtn: document.getElementById('start-analysis-btn'),
+        cancelBtn: document.getElementById('cancel-analysis-btn'),
+        newAnalysisBtn: document.getElementById('new-analysis-btn'),
+
+        // Status elements
+        analysisStatus: document.getElementById('analysis-status'),
+        errorMessage: document.getElementById('error-message'),
+
+        // Health check
+        systemStatus: document.getElementById('system-status')
+    };
+
+    // Debug: Log which elements were found
+    console.log("DOM Elements initialized:", {
+        formFound: !!DOM.seoForm,
+        toggleFound: !!DOM.wholeWebsiteToggle,
+        maxPagesFound: !!DOM.maxPagesInput
+    });
 }
 
-/**
-* Start status checking
-*/
-function startStatusChecking() {
-   if (!currentAnalysisId) {
-       console.error('No analysis ID available for status checking');
-       return;
-   }
-   
-   console.log('🔍 Starting status checks for analysis:', currentAnalysisId);
-   
-   // Clear any existing interval
-   if (statusCheckInterval) {
-       clearInterval(statusCheckInterval);
-   }
-   
-   statusCheckCount = 0;
-   showProgress();
-   
-   // Check status immediately
-   checkAnalysisStatus();
-   
-   // Set up periodic checks
-   statusCheckInterval = setInterval(() => {
-       if (statusCheckCount >= CONFIG.MAX_STATUS_CHECKS) {
-           console.warn('⏰ Max status checks reached, stopping');
-           clearInterval(statusCheckInterval);
-           showAlert('Analysis is taking too long. Please check back later.', 'warning');
-           resetAnalysisState();
-           return;
-       }
-       
-       checkAnalysisStatus();
-   }, CONFIG.STATUS_CHECK_INTERVAL);
+function setupEventListeners() {
+    // Form submission
+    if (DOM.seoForm) {
+        DOM.seoForm.addEventListener('submit', handleEnhancedFormSubmit);
+        console.log("✅ Form submit listener added");
+    }
+
+    // Control buttons
+    if (DOM.startBtn) {
+        DOM.startBtn.addEventListener('click', handleStartAnalysis);
+    }
+
+    if (DOM.cancelBtn) {
+        DOM.cancelBtn.addEventListener('click', handleCancelAnalysis);
+    }
+
+    if (DOM.newAnalysisBtn) {
+        DOM.newAnalysisBtn.addEventListener('click', handleNewAnalysis);
+    }
+
+    if (DOM.csvDownloadBtn) {
+        DOM.csvDownloadBtn.addEventListener('click', handleCSVDownload);
+    }
+
+    // FIXED: Toggle functionality with proper event handling
+    if (DOM.wholeWebsiteToggle) {
+        DOM.wholeWebsiteToggle.addEventListener('change', handleWholeWebsiteToggle);
+        DOM.wholeWebsiteToggle.addEventListener('click', handleWholeWebsiteToggle);
+        console.log("✅ Whole website toggle listener added");
+
+        // Initialize toggle state
+        setTimeout(() => {
+            handleWholeWebsiteToggle();
+        }, 100);
+    } else {
+        console.error("❌ Whole website toggle not found!");
+    }
 }
 
-/**
-* Check analysis status
-*/
-function checkAnalysisStatus() {
-   if (!currentAnalysisId) {
-       return;
-   }
-   
-   statusCheckCount++;
-   
-   fetch(`/api/status/${currentAnalysisId}`)
-   .then(response => {
-       if (!response.ok) {
-           throw new Error(`HTTP ${response.status}`);
-       }
-       return response.json();
-   })
-   .then(data => {
-       console.log('📊 Analysis status:', data);
-       
-       updateProgressDisplay(data);
-       
-       if (data.status === 'completed') {
-           console.log('🎉 Analysis completed!');
-           clearInterval(statusCheckInterval);
-           statusCheckInterval = null;
-           loadAnalysisResults(currentAnalysisId);
-       } else if (data.status === 'failed') {
-           console.error('❌ Analysis failed:', data.error_message);
-           clearInterval(statusCheckInterval);
-           statusCheckInterval = null;
-           showAlert(`Analysis failed: ${data.error_message || 'Unknown error'}`, 'error');
-           resetAnalysisState();
-       } else if (data.status === 'cancelled') {
-           console.log('⏹️ Analysis was cancelled');
-           clearInterval(statusCheckInterval);
-           statusCheckInterval = null;
-           showAlert('Analysis was cancelled', 'warning');
-           resetAnalysisState();
-       }
-       // Continue checking for running status
-       
-   })
-   .catch(error => {
-       console.error('❌ Status check failed:', error);
-       
-       // Don't stop on network errors, just log them
-       if (statusCheckCount > 10) {
-           clearInterval(statusCheckInterval);
-           statusCheckInterval = null;
-           showAlert('Lost connection to server. Please refresh and try again.', 'error');
-           resetAnalysisState();
-       }
-   });
+async function handleEnhancedFormSubmit(event) {
+    event.preventDefault();
+    console.log("🚀 Starting enhanced analysis...", getFormData());
+
+    try {
+        showError(''); // Clear any previous errors
+
+        const formData = getFormData();
+        console.log("📋 Form data collected:", formData);
+
+        const validationResult = validateFormData(formData);
+
+        if (!validationResult.isValid) {
+            showError(validationResult.message);
+            return;
+        }
+
+        await startEnhancedAnalysis(formData);
+
+    } catch (error) {
+        console.error('Enhanced analysis failed:', error);
+        showError(`Analysis failed: ${error.message}`);
+        resetToFormState();
+    }
 }
 
-/**
-* Load analysis results
-*/
-function loadAnalysisResults(analysisId) {
-   console.log('📊 Loading results for analysis:', analysisId);
-   
-   fetch(`/api/report/${analysisId}`)
-   .then(response => {
-       if (!response.ok) {
-           throw new Error(`HTTP ${response.status}`);
-       }
-       return response.json();
-   })
-   .then(data => {
-       console.log('📊 Enhanced results loaded:', data);
-       
-       hideLoading();
-       hideProgress();
-       displayResults(data);
-       updateSubmitButton(false);
-       enableForm(true);
-       isAnalysisRunning = false;
-       
-       // Load updated recent analyses
-       loadRecentAnalyses();
-       
-   })
-   .catch(error => {
-       console.error('❌ Failed to load results:', error);
-       showAlert('Failed to load analysis results. Please try again.', 'error');
-       resetAnalysisState();
-   });
+async function handleStartAnalysis() {
+    if (DOM.seoForm) {
+        const event = new Event('submit', { bubbles: true, cancelable: true });
+        DOM.seoForm.dispatchEvent(event);
+    }
 }
 
-/**
-* Display analysis results
-*/
-function displayResults(data) {
-   if (!elements.resultsDiv || !data.results) {
-       console.error('Missing results container or data');
-       return;
-   }
-   
-   console.log('🎨 Displaying results for analysis:', data.analysis_id);
-   
-   const results = data.results;
-   const metadata = data.metadata || {};
-   
-   let html = `
-       <div class="results-header">
-           <div class="d-flex justify-content-between align-items-center mb-4">
-               <h2>📊 SEO Analysis Results</h2>
-               <div>
-                   <span class="badge badge-success">Analysis ID: ${data.analysis_id}</span>
-                   ${data.file_info?.csv_available ? 
-                       `<a href="/api/download-csv/${data.analysis_id}" class="btn btn-outline-primary btn-sm ml-2">
-                           <i class="fas fa-download"></i> Download CSV
-                       </a>` : ''
-                   }
-               </div>
-           </div>
-       </div>
-       
-       <div class="row">
-           <!-- Executive Summary -->
-           <div class="col-12 mb-4">
-               <div class="card">
-                   <div class="card-header">
-                       <h3 class="mb-0">📈 Executive Summary</h3>
-                   </div>
-                   <div class="card-body">
-                       ${generateExecutiveSummary(results)}
-                   </div>
-               </div>
-           </div>
-       </div>
-       
-       <div class="row">
-           <!-- SEO Score Card -->
-           <div class="col-lg-4 col-md-6 mb-4">
-               <div class="card text-center">
-                   <div class="card-body">
-                       <h4 class="card-title">🎯 Overall SEO Score</h4>
-                       <div class="display-4 font-weight-bold ${getScoreClass(results.overall_score || 0)}">
-                           ${results.overall_score || 0}/100
-                       </div>
-                       <p class="text-muted">${getScoreDescription(results.overall_score || 0)}</p>
-                   </div>
-               </div>
-           </div>
-           
-           <!-- Pages Analyzed -->
-           <div class="col-lg-4 col-md-6 mb-4">
-               <div class="card text-center">
-                   <div class="card-body">
-                       <h4 class="card-title">📄 Pages Analyzed</h4>
-                       <div class="display-4 font-weight-bold text-info">
-                           ${results.pages ? results.pages.length : 0}
-                       </div>
-                       <p class="text-muted">Total pages scanned</p>
-                   </div>
-               </div>
-           </div>
-           
-           <!-- Issues Found -->
-           <div class="col-lg-4 col-md-6 mb-4">
-               <div class="card text-center">
-                   <div class="card-body">
-                       <h4 class="card-title">⚠️ Total Issues</h4>
-                       <div class="display-4 font-weight-bold text-warning">
-                           ${countTotalIssues(results)}
-                       </div>
-                       <p class="text-muted">Issues requiring attention</p>
-                   </div>
-               </div>
-           </div>
-       </div>
-       
-       <!-- SERP Analysis -->
-       ${results.serp_analysis ? generateSERPAnalysis(results.serp_analysis) : ''}
-       
-       <!-- Page Details -->
-       <div class="row">
-           <div class="col-12">
-               <div class="card">
-                   <div class="card-header">
-                       <h3 class="mb-0">📋 Detailed Page Analysis</h3>
-                   </div>
-                   <div class="card-body">
-                       ${generatePageDetails(results.pages || [])}
-                   </div>
-               </div>
-           </div>
-       </div>
-       
-       <!-- Recommendations -->
-       <div class="row">
-           <div class="col-12">
-               <div class="card">
-                   <div class="card-header">
-                       <h3 class="mb-0">💡 Recommendations</h3>
-                   </div>
-                   <div class="card-body">
-                       ${generateRecommendations(results)}
-                   </div>
-               </div>
-           </div>
-       </div>
-   `;
-   
-   elements.resultsDiv.innerHTML = html;
-   elements.resultsDiv.style.display = 'block';
-   
-   // Scroll to results
-   elements.resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function handleCancelAnalysis() {
+    console.log("🛑 Cancelling analysis...");
+
+    // Stop polling
+    if (ANALYSIS_STATE.statusPolling) {
+        clearInterval(ANALYSIS_STATE.statusPolling);
+        ANALYSIS_STATE.statusPolling = null;
+    }
+
+    // Reset state
+    ANALYSIS_STATE.currentAnalysisId = null;
+    ANALYSIS_STATE.isRunning = false;
+    ANALYSIS_STATE.retryCount = 0;
+
+    // Reset UI
+    resetToFormState();
+    showError('Analysis cancelled by user.');
 }
 
-/**
-* Generate executive summary
-*/
-function generateExecutiveSummary(results) {
-   const totalPages = results.pages ? results.pages.length : 0;
-   const averageScore = results.overall_score || 0;
-   const totalIssues = countTotalIssues(results);
-   
-   return `
-       <div class="row text-center">
-           <div class="col-md-3">
-               <div class="metric">
-                   <div class="metric-value">${totalPages}</div>
-                   <div class="metric-label">Pages Analyzed</div>
-               </div>
-           </div>
-           <div class="col-md-3">
-               <div class="metric">
-                   <div class="metric-value ${getScoreClass(averageScore)}">${averageScore}</div>
-                   <div class="metric-label">Average SEO Score</div>
-               </div>
-           </div>
-           <div class="col-md-3">
-               <div class="metric">
-                   <div class="metric-value text-warning">${totalIssues}</div>
-                   <div class="metric-label">Total Issues</div>
-               </div>
-           </div>
-           <div class="col-md-3">
-               <div class="metric">
-                   <div class="metric-value text-info">${results.analysis_type || 'selective'}</div>
-                   <div class="metric-label">Analysis Type</div>
-               </div>
-           </div>
-       </div>
-   `;
+function handleNewAnalysis() {
+    console.log("🆕 Starting new analysis...");
+
+    // Reset state
+    ANALYSIS_STATE.currentAnalysisId = null;
+    ANALYSIS_STATE.isRunning = false;
+    ANALYSIS_STATE.retryCount = 0;
+
+    // Clear form
+    if (DOM.seoForm) {
+        DOM.seoForm.reset();
+    }
+
+    // Reset UI
+    resetToFormState();
+    showError('');
+
+    // Re-initialize toggle state
+    setTimeout(() => {
+        handleWholeWebsiteToggle();
+    }, 100);
 }
 
-/**
-* Generate SERP analysis section
-*/
-function generateSERPAnalysis(serpData) {
-   if (!serpData || !serpData.competitors || serpData.competitors.length === 0) {
-       return '';
-   }
-   
-   return `
-       <div class="row">
-           <div class="col-12 mb-4">
-               <div class="card">
-                   <div class="card-header">
-                       <h3 class="mb-0">🔍 SERP Analysis</h3>
-                   </div>
-                   <div class="card-body">
-                       <div class="table-responsive">
-                           <table class="table table-hover">
-                               <thead>
-                                   <tr>
-                                       <th>Position</th>
-                                       <th>Domain</th>
-                                       <th>Title</th>
-                                       <th>Snippet</th>
-                                   </tr>
-                               </thead>
-                               <tbody>
-                                   ${serpData.competitors.map((competitor, index) => `
-                                       <tr>
-                                           <td><span class="badge badge-primary">${index + 1}</span></td>
-                                           <td><strong>${competitor.domain || 'N/A'}</strong></td>
-                                           <td>${competitor.title || 'N/A'}</td>
-                                           <td>${competitor.snippet || 'N/A'}</td>
-                                       </tr>
-                                   `).join('')}
-                               </tbody>
-                           </table>
-                       </div>
-                   </div>
-               </div>
-           </div>
-       </div>
-   `;
+// FIXED: Improved toggle handling with visual feedback
+function handleWholeWebsiteToggle() {
+    console.log("🔄 Toggle changed");
+
+    if (!DOM.wholeWebsiteToggle || !DOM.maxPagesInput) {
+        console.error("❌ Toggle elements not found");
+        return;
+    }
+
+    const isWholeWebsite = DOM.wholeWebsiteToggle.checked;
+    const maxPagesGroup = DOM.maxPagesInput.closest('.form-group');
+
+    console.log("🎯 Whole website mode:", isWholeWebsite);
+
+    if (maxPagesGroup) {
+        if (isWholeWebsite) {
+            maxPagesGroup.style.opacity = '0.5';
+            maxPagesGroup.style.pointerEvents = 'none';
+            DOM.maxPagesInput.disabled = true;
+
+            // Show whole website message
+            let helpText = maxPagesGroup.querySelector('small');
+            if (helpText) {
+                helpText.textContent = 'Whole website mode: Will discover and analyze ALL pages';
+                helpText.style.color = '#e67e22';
+                helpText.style.fontWeight = 'bold';
+            }
+        } else {
+            maxPagesGroup.style.opacity = '1';
+            maxPagesGroup.style.pointerEvents = 'auto';
+            DOM.maxPagesInput.disabled = false;
+
+            // Restore original message
+            let helpText = maxPagesGroup.querySelector('small');
+            if (helpText) {
+                helpText.textContent = 'For focused analysis, start with 5-20 pages';
+                helpText.style.color = '';
+                helpText.style.fontWeight = '';
+            }
+        }
+    }
+
+    // Update button text based on mode
+    if (DOM.startBtn) {
+        if (isWholeWebsite) {
+            DOM.startBtn.innerHTML = '🌐 Start Whole Website Analysis';
+            DOM.startBtn.style.background = '#e67e22';
+        } else {
+            DOM.startBtn.innerHTML = '🚀 Start Enhanced SEO Analysis';
+            DOM.startBtn.style.background = '';
+        }
+    }
 }
 
-/**
-* Generate page details
-*/
-function generatePageDetails(pages) {
-   if (!pages || pages.length === 0) {
-       return '<p class="text-muted">No pages analyzed.</p>';
-   }
-   
-   return `
-       <div class="table-responsive">
-           <table class="table table-hover">
-               <thead>
-                   <tr>
-                       <th>URL</th>
-                       <th>Title</th>
-                       <th>Status</th>
-                       <th>SEO Score</th>
-                       <th>Word Count</th>
-                       <th>Load Time</th>
-                       <th>Issues</th>
-                   </tr>
-               </thead>
-               <tbody>
-                   ${pages.map(page => `
-                       <tr>
-                           <td>
-                               <a href="${page.url}" target="_blank" title="${page.url}">
-                                   ${truncateText(page.url, 50)}
-                                   <i class="fas fa-external-link-alt ml-1"></i>
-                               </a>
-                           </td>
-                           <td>${page.title ? truncateText(page.title, 60) : '<em>No title</em>'}</td>
-                           <td>
-                               <span class="badge ${getStatusBadgeClass(page.status_code)}">
-                                   ${page.status_code}
-                               </span>
-                           </td>
-                           <td>
-                               <span class="font-weight-bold ${getScoreClass(page.seo_score || 0)}">
-                                   ${page.seo_score || 0}/100
-                               </span>
-                           </td>
-                           <td>${page.word_count || 0}</td>
-                           <td>${(page.load_time || 0).toFixed(2)}s</td>
-                           <td>
-                               ${page.issues && page.issues.length > 0 ? 
-                                   `<span class="badge badge-warning">${page.issues.length}</span>` : 
-                                   '<span class="badge badge-success">0</span>'
-                               }
-                           </td>
-                       </tr>
-                   `).join('')}
-               </tbody>
-           </table>
-       </div>
-   `;
+async function handleCSVDownload() {
+    if (!ANALYSIS_STATE.currentAnalysisId) {
+        showError('No analysis ID available for CSV download');
+        return;
+    }
+
+    try {
+        showMessage('Preparing CSV download...', 'info');
+
+        const response = await fetch(`${CONFIG.API_BASE}/api/download-csv/${ANALYSIS_STATE.currentAnalysisId}`);
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `seo_analysis_${ANALYSIS_STATE.currentAnalysisId}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            showMessage('CSV downloaded successfully!', 'success');
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'CSV download failed');
+        }
+    } catch (error) {
+        console.error('CSV download error:', error);
+        showError(`CSV download failed: ${error.message}`);
+    }
 }
 
-/**
-* Generate recommendations
-*/
-function generateRecommendations(results) {
-   const recommendations = [];
-   
-   // Analyze results and generate recommendations
-   if (results.overall_score < 70) {
-       recommendations.push({
-           priority: 'high',
-           title: 'Improve Overall SEO Score',
-           description: 'Your overall SEO score is below average. Focus on fixing critical issues first.'
-       });
-   }
-   
-   if (results.pages) {
-       const pagesWithoutTitles = results.pages.filter(p => !p.title).length;
-       if (pagesWithoutTitles > 0) {
-           recommendations.push({
-               priority: 'critical',
-               title: 'Add Missing Page Titles',
-               description: `${pagesWithoutTitles} pages are missing title tags, which is critical for SEO.`
-           });
-       }
-       
-       const pagesWithoutMetaDesc = results.pages.filter(p => !p.meta_description).length;
-       if (pagesWithoutMetaDesc > 0) {
-           recommendations.push({
-               priority: 'high',
-               title: 'Add Meta Descriptions',
-               description: `${pagesWithoutMetaDesc} pages are missing meta descriptions.`
-           });
-       }
-       
-       const slowPages = results.pages.filter(p => (p.load_time || 0) > 3).length;
-       if (slowPages > 0) {
-           recommendations.push({
-               priority: 'medium',
-               title: 'Improve Page Load Times',
-               description: `${slowPages} pages have slow load times (>3 seconds).`
-           });
-       }
-   }
-   
-   // Default recommendations if none generated
-   if (recommendations.length === 0) {
-       recommendations.push({
-           priority: 'low',
-           title: 'Great Job!',
-           description: 'Your website is performing well. Continue monitoring and making incremental improvements.'
-       });
-   }
-   
-   return recommendations.map(rec => `
-       <div class="alert alert-${getPriorityAlertClass(rec.priority)} d-flex align-items-center">
-           <div class="mr-3">
-               <i class="fas ${getPriorityIcon(rec.priority)} fa-2x"></i>
-           </div>
-           <div>
-               <h5 class="alert-heading mb-1">${rec.title}</h5>
-               <p class="mb-0">${rec.description}</p>
-           </div>
-       </div>
-   `).join('');
+function getFormData() {
+    const formData = {
+        website_url: DOM.websiteUrlInput?.value?.trim() || '',
+        target_keyword: DOM.targetKeywordInput?.value?.trim() || '',
+        max_pages: parseInt(DOM.maxPagesInput?.value) || 10,
+        whole_website: DOM.wholeWebsiteToggle?.checked || false,
+        serp_analysis: DOM.serpAnalysisToggle?.checked !== false,
+        use_cache: true
+    };
+
+    console.log("📝 Form data:", formData);
+    return formData;
 }
 
-/**
-* Load recent analyses
-*/
-function loadRecentAnalyses() {
-   if (!elements.recentAnalyses) {
-       return;
-   }
-   
-   fetch('/api/recent-analyses?limit=5')
-   .then(response => response.json())
-   .then(data => {
-       if (data.analyses && data.analyses.length > 0) {
-           displayRecentAnalyses(data.analyses);
-       } else {
-           elements.recentAnalyses.innerHTML = '<p class="text-muted">No recent analyses found.</p>';
-       }
-   })
-   .catch(error => {
-       console.error('Failed to load recent analyses:', error);
-       elements.recentAnalyses.innerHTML = '<p class="text-muted">Failed to load recent analyses.</p>';
-   });
+function validateFormData(data) {
+    if (!data.website_url) {
+        return { isValid: false, message: 'Please enter a website URL' };
+    }
+
+    if (!data.target_keyword) {
+        return { isValid: false, message: 'Please enter a target keyword' };
+    }
+
+    // URL validation
+    try {
+        new URL(data.website_url);
+    } catch (e) {
+        return { isValid: false, message: 'Please enter a valid URL (include https://)' };
+    }
+
+    // Pages validation (only for non-whole website mode)
+    if (!data.whole_website && (data.max_pages < 1 || data.max_pages > 100)) {
+        return { isValid: false, message: 'Pages to analyze must be between 1 and 100' };
+    }
+
+    return { isValid: true };
 }
 
-/**
-* Display recent analyses
-*/
-function displayRecentAnalyses(analyses) {
-   const html = analyses.map(analysis => `
-       <div class="card mb-2">
-           <div class="card-body py-2">
-               <div class="d-flex justify-content-between align-items-center">
-                   <div>
-                       <strong>${analysis.website_url}</strong>
-                       <small class="text-muted d-block">
-                           ${analysis.target_keyword} • ${analysis.pages_analyzed} pages • 
-                           ${new Date(analysis.created_at).toLocaleDateString()}
-                       </small>
-                   </div>
-                   <button class="btn btn-outline-primary btn-sm" 
-                           onclick="loadPreviousAnalysis('${analysis.id}')">
-                       View Results
-                   </button>
-               </div>
-           </div>
-       </div>
-   `).join('');
-   
-   elements.recentAnalyses.innerHTML = html;
+async function startEnhancedAnalysis(formData) {
+    try {
+        showProgressState();
+        updateProgress(0, 'Starting analysis...', 'Initializing enhanced SEO analysis');
+
+        ANALYSIS_STATE.isRunning = true;
+        ANALYSIS_STATE.retryCount = 0;
+
+        // Add analysis mode to progress message
+        const analysisType = formData.whole_website ? 'Whole Website Analysis' : 'Selective Page Analysis';
+        updateProgress(5, `Starting ${analysisType}...`, `Preparing to analyze ${formData.website_url}`);
+
+        const response = await fetchWithRetry(`${CONFIG.API_BASE}/api/analyze`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            let errorMessage;
+
+            try {
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+            } catch (e) {
+                // Response is not JSON (likely HTML error page)
+                if (errorText.includes('<html')) {
+                    errorMessage = `Server error (${response.status}). Please try again.`;
+                } else {
+                    errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`;
+                }
+            }
+
+            // Handle specific status codes
+            if (response.status === 429) {
+                errorMessage = 'Rate limit exceeded. Please wait before trying again.';
+            } else if (response.status === 400) {
+                errorMessage = errorMessage || 'Invalid request. Please check your input.';
+            }
+
+            throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        console.log("🎉 Analysis started:", result);
+
+        // Store the analysis ID
+        ANALYSIS_STATE.currentAnalysisId = result.analysis_id;
+
+        // Start status polling
+        startStatusPolling();
+
+        // Update progress
+        updateProgress(10, 'Analysis queued successfully!', 
+                      `Analysis ID: ${result.analysis_id}\nEstimated duration: ${Math.round(result.estimated_duration_seconds / 60)} minutes`);
+
+    } catch (error) {
+        console.error('Error starting analysis:', error);
+        ANALYSIS_STATE.isRunning = false;
+        throw error;
+    }
 }
 
-/**
-* Load previous analysis
-*/
-function loadPreviousAnalysis(analysisId) {
-   console.log('📂 Loading previous analysis:', analysisId);
-   
-   // Reset current state
-   resetAnalysisState();
-   
-   // Show loading
-   showLoading();
-   
-   // Load the analysis results
-   fetch(`/api/report/${analysisId}`)
-   .then(response => {
-       if (!response.ok) {
-           throw new Error(`Failed to load analysis: ${response.status}`);
-       }
-       return response.json();
-   })
-   .then(data => {
-       console.log('📊 Previous analysis loaded:', data);
-       hideLoading();
-       displayResults(data);
-       showAlert('Previous analysis loaded successfully', 'success');
-   })
-   .catch(error => {
-       console.error('❌ Failed to load previous analysis:', error);
-       hideLoading();
-       showAlert('Failed to load previous analysis', 'error');
-   });
+async function fetchWithRetry(url, options, retries = CONFIG.MAX_RETRIES) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await fetch(url, options);
+        } catch (error) {
+            console.warn(`Fetch attempt ${i + 1} failed:`, error);
+            if (i === retries - 1) throw error;
+            await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY * (i + 1)));
+        }
+    }
 }
 
-/**
-* Perform health check
-*/
-function performHealthCheck() {
-   fetch('/api/health')
-   .then(response => response.json())
-   .then(data => {
-       console.log('🏥 System health check:', data);
-       
-       if (data.status !== 'healthy') {
-           showAlert('System health check failed. Some features may not work properly.', 'warning');
-       }
-   })
-   .catch(error => {
-       console.error('❌ Health check failed:', error);
-   });
+function startStatusPolling() {
+    if (ANALYSIS_STATE.statusPolling) {
+        clearInterval(ANALYSIS_STATE.statusPolling);
+    }
+
+    ANALYSIS_STATE.statusPolling = setInterval(async () => {
+        try {
+            await checkAnalysisStatus();
+        } catch (error) {
+            console.error('Status polling error:', error);
+            ANALYSIS_STATE.retryCount++;
+
+            if (ANALYSIS_STATE.retryCount >= CONFIG.MAX_RETRIES) {
+                clearInterval(ANALYSIS_STATE.statusPolling);
+                ANALYSIS_STATE.statusPolling = null;
+                showError('Lost connection to analysis. Please refresh the page and check results manually.');
+                resetToFormState();
+            }
+        }
+    }, CONFIG.STATUS_POLL_INTERVAL);
+
+    // Also check immediately
+    setTimeout(checkAnalysisStatus, 1000);
 }
 
-// UI Helper Functions
+async function checkAnalysisStatus() {
+    if (!ANALYSIS_STATE.currentAnalysisId || !ANALYSIS_STATE.isRunning) {
+        return;
+    }
 
-/**
-* Update submit button state
-*/
-function updateSubmitButton(isLoading) {
-   if (!elements.submitBtn) return;
-   
-   if (isLoading) {
-       elements.submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
-       elements.submitBtn.disabled = true;
-       elements.submitBtn.classList.add('disabled');
-       
-       if (elements.newAnalysisBtn) {
-           elements.newAnalysisBtn.style.display = 'inline-block';
-       }
-       if (elements.cancelBtn) {
-           elements.cancelBtn.style.display = 'inline-block';
-       }
-   } else {
-       elements.submitBtn.innerHTML = '<i class="fas fa-search"></i> Start Enhanced SEO Analysis';
-       elements.submitBtn.disabled = false;
-       elements.submitBtn.classList.remove('disabled');
-       
-       if (elements.newAnalysisBtn) {
-           elements.newAnalysisBtn.style.display = 'none';
-       }
-       if (elements.cancelBtn) {
-           elements.cancelBtn.style.display = 'none';
-       }
-   }
+    const response = await fetch(`${CONFIG.API_BASE}/api/status/${ANALYSIS_STATE.currentAnalysisId}`);
+
+    if (!response.ok) {
+        throw new Error(`Status check failed: ${response.status}`);
+    }
+
+    const status = await response.json();
+    console.log("📊 Analysis status:", status);
+
+    // Reset retry count on successful response
+    ANALYSIS_STATE.retryCount = 0;
+
+    // Update progress with enhanced information
+    if (status.progress_info) {
+        updateProgress(
+            status.progress_info.percentage,
+            status.progress,
+            `Step ${status.progress_info.current_step}/${status.progress_info.total_steps} | ${status.progress_info.elapsed_time} elapsed | ~${status.progress_info.estimated_remaining} remaining`
+        );
+    } else {
+        updateProgress(null, status.progress || 'Processing...', status.status || 'Running analysis...');
+    }
+
+    // Handle completion
+    if (status.status === 'completed') {
+        clearInterval(ANALYSIS_STATE.statusPolling);
+        ANALYSIS_STATE.statusPolling = null;
+        ANALYSIS_STATE.isRunning = false;
+
+        updateProgress(100, '✅ Analysis Complete!', 'Loading comprehensive results...');
+
+        setTimeout(() => {
+            loadEnhancedResults();
+        }, 1000);
+
+    } else if (status.status === 'error') {
+        clearInterval(ANALYSIS_STATE.statusPolling);
+        ANALYSIS_STATE.statusPolling = null;
+        ANALYSIS_STATE.isRunning = false;
+
+        showError(`❌ Analysis failed: ${status.error || 'Unknown error occurred'}`);
+        resetToFormState();
+    }
 }
 
-/**
-* Show/hide loading indicator
-*/
-function showLoading() {
-   if (elements.loadingDiv) {
-       elements.loadingDiv.style.display = 'block';
-   }
+async function loadEnhancedResults() {
+    try {
+        showMessage('Loading comprehensive results...', 'info');
+
+        const response = await fetch(`${CONFIG.API_BASE}/api/report/${ANALYSIS_STATE.currentAnalysisId}`);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to load results');
+        }
+
+        const result = await response.json();
+        console.log("📊 Enhanced results loaded:", result);
+
+        displayResults(result);
+
+    } catch (error) {
+        console.error('Error loading results:', error);
+        showError(`Failed to load results: ${error.message}`);
+        resetToFormState();
+    }
 }
 
-function hideLoading() {
-   if (elements.loadingDiv) {
-       elements.loadingDiv.style.display = 'none';
-   }
+function displayResults(result) {
+    showResultsState();
+
+    // Display the report content
+    if (DOM.reportContent && result.report) {
+        // Enhanced markdown to HTML conversion
+        const htmlContent = convertMarkdownToHTML(result.report);
+        DOM.reportContent.innerHTML = htmlContent;
+
+        // Add some styling to the results
+        DOM.reportContent.style.maxHeight = 'none';
+        DOM.reportContent.style.overflow = 'visible';
+    }
+
+    // Enable CSV download if available
+    if (DOM.csvDownloadBtn && result.metadata && result.metadata.status === 'success') {
+        DOM.csvDownloadBtn.style.display = 'inline-block';
+    }
+
+    // Show enhanced completion message
+    const pagesAnalyzed = result.metadata?.pages_analyzed || 'Unknown';
+    const duration = result.metadata?.crawl_duration ? 
+        ` in ${Math.round(result.metadata.crawl_duration)}s` : '';
+
+    showMessage(`🎉 Analysis completed successfully! Analyzed ${pagesAnalyzed} pages${duration}`, 'success');
 }
 
-/**
-* Show/hide progress indicator
-*/
-function showProgress() {
-   if (elements.progressDiv) {
-       elements.progressDiv.style.display = 'block';
-   }
+// Enhanced markdown to HTML conversion
+function convertMarkdownToHTML(markdown) {
+    return markdown
+        // Headers
+        .replace(/^# (.*$)/gm, '<h1 class="seo-h1">$1</h1>')
+        .replace(/^## (.*$)/gm, '<h2 class="seo-h2">$1</h2>')
+        .replace(/^### (.*$)/gm, '<h3 class="seo-h3">$1</h3>')
+        .replace(/^#### (.*$)/gm, '<h4 class="seo-h4">$1</h4>')
+
+        // Bold and italic
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+
+        // Lists (improved)
+        .replace(/^\* (.*$)/gm, '<li>$1</li>')
+        .replace(/^- (.*$)/gm, '<li>$1</li>')
+        .replace(/(- .*<\/li>)/s, '<ul>$1</ul>')
+
+        // Tables (improved)
+        .replace(/^\|(.*)\|$/gm, function(match, content) {
+            const cells = content.split('|').map(cell => `<td>${cell.trim()}</td>`).join('');
+            return `<tr>${cells}</tr>`;
+        })
+        .replace(/(<tr>.*<\/tr>\s*)+/gs, function(match) {
+            return `<table class="seo-table">${match}</table>`;
+        })
+
+        // Line breaks
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+
+        // Wrap in paragraphs
+        .replace(/^(?!<[h|u|t|l])/gm, '<p>')
+        .replace(/(.*?)$/gm, '$1</p>')
+
+        // Clean up empty paragraphs
+        .replace(/<p><\/p>/g, '')
+        .replace(/<p>(<[^>]*>)/g, '$1')
+        .replace(/(<\/[^>]*>)<\/p>/g, '$1');
 }
 
-function hideProgress() {
-   if (elements.progressDiv) {
-       elements.progressDiv.style.display = 'none';
-   }
+// UI State Management
+function showProgressState() {
+    setUIState('progress');
 }
 
-/**
-* Update progress display
-*/
-function updateProgressDisplay(statusData) {
-   if (!elements.progressBar || !elements.progressText) {
-       return;
-   }
-   
-   const progress = statusData.progress || 0;
-   const message = statusData.message || 'Processing...';
-   const elapsed = statusData.elapsed_formatted || '0s';
-   
-   elements.progressBar.style.width = `${progress}%`;
-   elements.progressBar.setAttribute('aria-valuenow', progress);
-   elements.progressText.textContent = `${message} (${elapsed} elapsed)`;
+function showResultsState() {
+    setUIState('results');
 }
 
-/**
-* Show/hide results
-*/
-function hideResults() {
-   if (elements.resultsDiv) {
-       elements.resultsDiv.style.display = 'none';
-   }
+function resetToFormState() {
+    setUIState('form');
 }
 
-/**
-* Enable/disable form
-*/
-function enableForm(enabled) {
-   const formElements = elements.form ? elements.form.querySelectorAll('input, select, textarea') : [];
-   formElements.forEach(element => {
-       element.disabled = !enabled;
-   });
+function setUIState(state) {
+    // Hide all sections
+    const sections = ['form-section', 'progress-section', 'results-section'];
+    sections.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.style.display = 'none';
+    });
+
+    // Show appropriate section
+    const targetSection = document.getElementById(`${state}-section`);
+    if (targetSection) {
+        targetSection.style.display = 'block';
+    }
+
+    // Update button states
+    updateButtonStates(state);
 }
 
-/**
-* Show alert message
-*/
-function showAlert(message, type = 'info') {
-   if (!elements.alertDiv) return;
-   
-   const alertClasses = {
-       'success': 'alert-success',
-       'error': 'alert-danger',
-       'warning': 'alert-warning',
-       'info': 'alert-info'
-   };
-   
-   const alertClass = alertClasses[type] || 'alert-info';
-   
-   elements.alertDiv.innerHTML = `
-       <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
-           ${message}
-           <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-               <span aria-hidden="true">&times;</span>
-           </button>
-       </div>
-   `;
-   
-   elements.alertDiv.style.display = 'block';
-   
-   // Auto-hide success/info alerts after 5 seconds
-   if (type === 'success' || type === 'info') {
-       setTimeout(() => {
-           hideAlert();
-       }, 5000);
-   }
+function updateButtonStates(state) {
+    const buttons = {
+        start: DOM.startBtn,
+        cancel: DOM.cancelBtn,
+        new: DOM.newAnalysisBtn,
+        csvDownload: DOM.csvDownloadBtn
+    };
+
+    // Hide all buttons first
+    Object.values(buttons).forEach(btn => {
+        if (btn) btn.style.display = 'none';
+    });
+
+    // Show appropriate buttons based on state
+    switch (state) {
+        case 'form':
+            if (buttons.start) buttons.start.style.display = 'inline-block';
+            break;
+        case 'progress':
+            if (buttons.cancel) buttons.cancel.style.display = 'inline-block';
+            break;
+        case 'results':
+            if (buttons.new) buttons.new.style.display = 'inline-block';
+            if (buttons.csvDownload) buttons.csvDownload.style.display = 'inline-block';
+            break;
+    }
 }
 
-/**
-* Hide alert message
-*/
-function hideAlert() {
-   if (elements.alertDiv) {
-       elements.alertDiv.style.display = 'none';
-   }
+function updateProgress(percentage, message, details) {
+    if (DOM.progressText) {
+        DOM.progressText.textContent = message || 'Processing...';
+    }
+
+    if (DOM.progressDetails) {
+        DOM.progressDetails.textContent = details || '';
+    }
+
+    if (DOM.progressFill && percentage !== null) {
+        const safePercentage = Math.min(100, Math.max(0, percentage));
+        DOM.progressFill.style.width = `${safePercentage}%`;
+
+        // Enhanced visual feedback
+        if (safePercentage < 100) {
+            DOM.progressFill.style.background = 'linear-gradient(45deg, #3498db, #2ecc71)';
+        } else {
+            DOM.progressFill.style.background = 'linear-gradient(45deg, #27ae60, #2ecc71)';
+        }
+    }
 }
 
-// Form Validation Functions
-
-/**
-* Validate form data
-*/
-function validateForm(formData) {
-   let isValid = true;
-   
-   // Clear previous errors
-   clearAllFieldErrors();
-   
-   // Validate website URL
-   if (!formData.website_url) {
-       showFieldError('websiteUrl', 'Website URL is required');
-       isValid = false;
-   } else if (!isValidUrl(formData.website_url)) {
-       showFieldError('websiteUrl', 'Please enter a valid website URL');
-       isValid = false;
-   }
-   
-   // Validate target keyword
-   if (!formData.target_keyword) {
-       showFieldError('targetKeyword', 'Target keyword is required');
-       isValid = false;
-   }
-   
-   // Validate max pages
-   if (!formData.whole_website && (formData.max_pages < 1 || formData.max_pages > 50)) {
-       showFieldError('maxPages', 'Max pages must be between 1 and 50');
-       isValid = false;
-   }
-   
-   return isValid;
+function showError(message) {
+    showMessage(message, 'error');
 }
 
-/**
-* Validate individual field
-*/
-function validateField(event) {
-   const field = event.target;
-   const value = field.value.trim();
-   
-   clearFieldError(field.id);
-   
-   if (field.id === 'websiteUrl' && value && !isValidUrl(value)) {
-       showFieldError(field.id, 'Please enter a valid website URL');
-   }
+function showMessage(message, type = 'info') {
+    if (!DOM.errorMessage) return;
+
+    if (!message) {
+        DOM.errorMessage.style.display = 'none';
+        return;
+    }
+
+    DOM.errorMessage.textContent = message;
+    DOM.errorMessage.className = `alert alert-${type}`;
+    DOM.errorMessage.style.display = 'block';
+
+    // Auto-hide success messages
+    if (type === 'success') {
+        setTimeout(() => {
+            if (DOM.errorMessage) {
+                DOM.errorMessage.style.display = 'none';
+            }
+        }, 8000); // Increased to 8 seconds
+    }
 }
 
-/**
-* Show field error
-*/
-function showFieldError(fieldId, message) {
-   const field = document.getElementById(fieldId);
-   if (!field) return;
-   
-   field.classList.add('is-invalid');
-   
-   let errorElement = field.parentNode.querySelector('.invalid-feedback');
-   if (!errorElement) {
-       errorElement = document.createElement('div');
-       errorElement.classList.add('invalid-feedback');
-       field.parentNode.appendChild(errorElement);
-   }
-   
-   errorElement.textContent = message;
+// System Health Check
+async function performHealthCheck() {
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/health`);
+        const health = await response.json();
+
+        console.log("🏥 System health check:", health);
+
+        if (DOM.systemStatus) {
+            if (health.status === 'healthy') {
+                DOM.systemStatus.innerHTML = '🟢 System Online';
+                DOM.systemStatus.style.color = '#27ae60';
+            } else {
+                DOM.systemStatus.innerHTML = '🟡 System Issues';
+                DOM.systemStatus.style.color = '#f39c12';
+            }
+        }
+
+    } catch (error) {
+        console.error('Health check failed:', error);
+        if (DOM.systemStatus) {
+            DOM.systemStatus.innerHTML = '🔴 Connection Error';
+            DOM.systemStatus.style.color = '#e74c3c';
+        }
+    }
 }
 
-/**
-* Clear field error
-*/
-function clearFieldError(fieldId) {
-   const field = document.getElementById(fieldId);
-   if (!field) return;
-   
-   field.classList.remove('is-invalid');
-   
-   const errorElement = field.parentNode.querySelector('.invalid-feedback');
-   if (errorElement) {
-       errorElement.remove();
-   }
-}
+// Update UI based on current state
+function updateUI() {
+    // Set initial state
+    resetToFormState();
 
-/**
-* Clear all field errors
-*/
-function clearAllFieldErrors() {
-   const invalidFields = document.querySelectorAll('.is-invalid');
-   invalidFields.forEach(field => {
-       field.classList.remove('is-invalid');
-   });
-   
-   const errorElements = document.querySelectorAll('.invalid-feedback');
-   errorElements.forEach(element => {
-       element.remove();
-   });
+    // Configure whole website toggle
+    setTimeout(() => {
+        handleWholeWebsiteToggle();
+    }, 100);
 }
 
 // Utility Functions
-
-/**
-* Check if URL is valid
-*/
-function isValidUrl(string) {
-   try {
-       const url = new URL(string);
-       return url.protocol === 'http:' || url.protocol === 'https:';
-   } catch {
-       return false;
-   }
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-/**
-* Debounce function
-*/
-function debounce(func, wait) {
-   let timeout;
-   return function executedFunction(...args) {
-       const later = () => {
-           clearTimeout(timeout);
-           func(...args);
-       };
-       clearTimeout(timeout);
-       timeout = setTimeout(later, wait);
-   };
+function formatDuration(seconds) {
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}m ${remainingSeconds}s`;
 }
 
-/**
-* Truncate text
-*/
-function truncateText(text, maxLength) {
-   if (!text) return '';
-   return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-}
+// Export for global access
+window.EnhancedSEOAudit = {
+    startAnalysis: handleStartAnalysis,
+    cancelAnalysis: handleCancelAnalysis,
+    downloadCSV: handleCSVDownload,
+    healthCheck: performHealthCheck,
+    state: ANALYSIS_STATE,
+    config: CONFIG
+};
 
-/**
-* Get score CSS class
-*/
-function getScoreClass(score) {
-   if (score >= 90) return 'text-success';
-   if (score >= 70) return 'text-warning';
-   if (score >= 50) return 'text-orange';
-   return 'text-danger';
-}
-
-/**
-* Get score description
-*/
-function getScoreDescription(score) {
-   if (score >= 90) return 'Excellent';
-   if (score >= 80) return 'Good';
-   if (score >= 60) return 'Average';
-   if (score >= 40) return 'Below Average';
-   return 'Poor';
-}
-
-/**
-* Get status badge class
-*/
-function getStatusBadgeClass(statusCode) {
-   if (statusCode >= 200 && statusCode < 300) return 'badge-success';
-   if (statusCode >= 300 && statusCode < 400) return 'badge-warning';
-   return 'badge-danger';
-}
-
-/**
-* Count total issues across all pages
-*/
-function countTotalIssues(results) {
-   if (!results.pages) return 0;
-   return results.pages.reduce((total, page) => {
-       return total + (page.issues ? page.issues.length : 0);
-   }, 0);
-}
-
-/**
-* Get priority alert class
-*/
-function getPriorityAlertClass(priority) {
-   const classes = {
-       'critical': 'danger',
-       'high': 'warning',
-       'medium': 'info',
-       'low': 'success'
-   };
-   return classes[priority] || 'info';
-}
-
-/**
-* Get priority icon
-*/
-function getPriorityIcon(priority) {
-   const icons = {
-       'critical': 'fa-exclamation-triangle',
-       'high': 'fa-exclamation-circle',
-       'medium': 'fa-info-circle',
-       'low': 'fa-check-circle'
-   };
-   return icons[priority] || 'fa-info-circle';
-}
-
-// Make functions available globally for onclick handlers
-window.loadPreviousAnalysis = loadPreviousAnalysis;
-
-console.log('✅ Enhanced SEO Audit Tool V3.0 JavaScript initialization complete!');
+console.log("✅ Enhanced SEO Audit Tool V3.0 JavaScript initialization complete!");
