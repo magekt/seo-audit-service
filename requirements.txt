@@ -1,13 +1,10 @@
-# Enhanced SEO Audit Tool V3.0 - Fixed Production Dependencies
-# Compatible with Python 3.11+ including Python 3.13
-
-# Essential Build Tools (CRITICAL FIX for setuptools error)
-setuptools>=68.0.0
-wheel>=0.38.0
+# Enhanced SEO Audit Tool V3.0 - Python 3.11 Compatible Dependencies
+# FIXED for Python 3.13 compatibility issues
 
 # Core Flask Framework
 Flask==2.3.3
 Flask-CORS==4.0.0
+Werkzeug==2.3.7
 
 # HTTP and Web Scraping
 aiohttp==3.8.6
@@ -25,19 +22,14 @@ numpy==1.24.4
 # Text Processing and Analysis
 textstat==0.7.3
 
-# URL Processing (fixed version for Python 3.13 compatibility)
+# URL Processing
 urllib3==2.0.7
 
-# Production Dependencies
+# Production WSGI Server
 gunicorn==21.2.0
+
+# Environment Management
 python-dotenv==1.0.0
 
-# NOTE: Built-in modules removed (sqlite3, asyncio, pathlib, datetime, logging, 
-#       json, re, hashlib, threading, time, uuid, os, sys, collections, 
-#       dataclasses, typing) - these don't need to be in requirements.txt
-
-# Development Dependencies (uncomment for development)
-# pytest==7.4.2
-# black==23.7.0 
-# flake8==6.1.0
-# mypy==1.5.1
+# CRITICAL: Do not include setuptools or wheel in requirements.txt
+# These will be handled by the runtime environment
