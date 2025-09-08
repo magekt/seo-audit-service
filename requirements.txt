@@ -16,8 +16,8 @@ requests==2.31.0
 validators==0.22.0
 
 # Data Processing and Analysis (avoid problematic pandas/numpy)
-# pandas==2.1.4  # Commented out - causes build issues
-# numpy==1.26.2   # Commented out - causes build issues
+pandas==2.1.4  # Commented out - causes build issues
+numpy==1.26.2   # Commented out - causes build issues
 
 # Text Processing and Analysis
 textstat==0.7.3
