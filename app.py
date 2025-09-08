@@ -1,666 +1,619 @@
-"""
-Enhanced SEO Audit Tool - Flask Application V3.0
-Production-ready web application with FUNCTIONAL advanced features
-"""
-
 import os
 import json
-import time
-import uuid
-import asyncio
-import logging
 import sqlite3
+import asyncio
+import aiohttp
+import logging
+import uuid
 from datetime import datetime, timedelta
-from threading import Thread, Lock
 from pathlib import Path
-from typing import Dict, Any, Optional
-import validators
-from flask import Flask, request, jsonify, render_template, send_file, url_for
-from flask_cors import CORS
-from urllib.parse import urlparse, urlunparse
+from typing import Dict, List, Optional, Tuple, Any
+from urllib.parse import urljoin, urlparse
+import time
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
-# Import enhanced SEO engine
-from seo_engine import EnhancedSEOEngine, CacheManager
-from config import Config
-import utils
+from flask import Flask, render_template, request, jsonify, send_file, session
+from werkzeug.exceptions import BadRequest, NotFound
+import pandas as pd
 
-# Enhanced logging configuration
-os.makedirs('logs', exist_ok=True)
-os.makedirs('reports', exist_ok=True)
-os.makedirs('exports', exist_ok=True)
-os.makedirs('cache', exist_ok=True)
-os.makedirs('static/img', exist_ok=True)
+from seo_engine import EnhancedSEOAnalyzer
+from utils import (
+    sanitize_filename, validate_url, setup_directories,
+    format_elapsed_time, get_client_ip, rate_limit_check,
+    setup_logging, load_config, validate_analysis_params
+)
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config.from_object(Config)
+app.secret_key = os.getenv('SECRET_KEY', 'seo-audit-secret-key-change-in-production')
 
-# Enable CORS
-CORS(app, origins=["*"])
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/app.log'),
-        logging.StreamHandler()
-    ]
-)
-
+# Load configuration
+config = load_config()
+setup_logging()
 logger = logging.getLogger(__name__)
 
-# Initialize enhanced components
-config = Config()
-seo_engine = EnhancedSEOEngine(config)
-cache_manager = CacheManager()
+# Create necessary directories
+setup_directories()
 
-# Global state management
-analyses: Dict[str, Dict[str, Any]] = {}
-analyses_lock = Lock()
-
-class RateLimiter:
-    """Simple rate limiter"""
-    def __init__(self, max_requests: int = 10, window_minutes: int = 60):
-        self.max_requests = max_requests
-        self.window_seconds = window_minutes * 60
-        self.requests = {}
-
-    def is_allowed(self, client_ip: str = None) -> bool:
-        if not client_ip:
-            client_ip = request.remote_addr
-        now = time.time()
-        if client_ip not in self.requests:
-            self.requests[client_ip] = []
-
-        # Clean old requests
-        self.requests[client_ip] = [
-            req_time for req_time in self.requests[client_ip]
-            if now - req_time < self.window_seconds
-        ]
-
-        if len(self.requests[client_ip]) >= self.max_requests:
-            return False
-        self.requests[client_ip].append(now)
-        return True
-
-    def time_until_allowed(self, client_ip: str = None) -> int:
-        if not client_ip:
-            client_ip = request.remote_addr
-        if client_ip not in self.requests or not self.requests[client_ip]:
-            return 0
-        oldest_request = min(self.requests[client_ip])
-        return max(0, int(self.window_seconds - (time.time() - oldest_request)))
-
-class ProgressTracker:
-    """Enhanced progress tracking"""
-    def __init__(self, total_steps: int = 5, description: str = "SEO Analysis"):
-        self.total_steps = total_steps
-        self.current_step = 0
-        self.description = description
-        self.start_time = time.time()
-        self.step_descriptions = []
-
-    def increment(self, step_description: str = ""):
-        self.current_step += 1
-        if step_description:
-            self.step_descriptions.append(step_description)
-
-    def get_status(self):
-        elapsed = time.time() - self.start_time
-        percentage = min(100, (self.current_step / self.total_steps) * 100)
+# Initialize database
+def init_db():
+    """Initialize SQLite database for analysis tracking and caching"""
+    try:
+        os.makedirs('cache', exist_ok=True)
+        conn = sqlite3.connect('cache/seo_analysis.db')
+        cursor = conn.cursor()
         
-        # Estimate remaining time
-        if self.current_step > 0:
-            time_per_step = elapsed / self.current_step
-            remaining_steps = self.total_steps - self.current_step
-            estimated_remaining = remaining_steps * time_per_step
-        else:
-            estimated_remaining = 0
+        # Analysis tracking table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analysis_sessions (
+                id TEXT PRIMARY KEY,
+                website_url TEXT NOT NULL,
+                target_keyword TEXT,
+                analysis_type TEXT NOT NULL,
+                status TEXT DEFAULT 'running',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                client_ip TEXT,
+                result_data TEXT,
+                csv_file_path TEXT,
+                error_message TEXT,
+                pages_analyzed INTEGER DEFAULT 0,
+                total_pages INTEGER DEFAULT 0,
+                enhanced_features TEXT
+            )
+        ''')
+        
+        # Cache table for individual page data
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS page_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                url_hash TEXT UNIQUE NOT NULL,
+                analysis_data TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                access_count INTEGER DEFAULT 1
+            )
+        ''')
+        
+        # Create indexes for better performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_url ON analysis_sessions(website_url)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_status ON analysis_sessions(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_cache_hash ON page_cache(url_hash)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_cache_created ON page_cache(created_at)')
+        
+        conn.commit()
+        conn.close()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Database initialization error: {str(e)}")
+        raise
 
-        return {
-            'percentage': round(percentage, 1),
-            'current_step': self.current_step,
-            'total_steps': self.total_steps,
-            'elapsed_time': elapsed,
-            'remaining_time': max(0, estimated_remaining),
-            'step_description': self.step_descriptions[-1] if self.step_descriptions else self.description
-        }
+# Global variables for analysis management
+active_analyses = {}
+analysis_lock = threading.Lock()
 
-class EnhancedAnalysisManager:
-    """Enhanced analysis manager with FUNCTIONAL features"""
-    def __init__(self):
-        self.active_analyses = {}
+@app.before_first_request
+def initialize():
+    """Initialize application before first request"""
+    init_db()
 
-    def start_enhanced_analysis(self, analysis_id: str, website_url: str, target_keyword: str,
-                              max_pages: int, whole_website: bool = False):
-        """Start enhanced SEO analysis with FUNCTIONAL features"""
-        def run_enhanced_analysis():
-            try:
-                time.sleep(0.5)  # Initial delay
-
-                # Enhanced validation
-                max_retries = 3
-                analysis_found = False
-                for attempt in range(max_retries):
-                    if analysis_id in analyses:
-                        analysis_found = True
-                        break
-                    logger.warning(f"Enhanced analysis {analysis_id} not found on attempt {attempt + 1}")
-                    time.sleep(1)
-
-                if not analysis_found:
-                    logger.error(f"Enhanced analysis {analysis_id} not found after {max_retries} attempts")
-                    return
-
-                # Update status to running
-                with analyses_lock:
-                    analyses[analysis_id]['status'] = 'running'
-                    analyses[analysis_id]['progress'] = 'Initializing enhanced SEO analysis with advanced features...'
-
-                logger.info(f"Starting enhanced analysis {analysis_id} for {website_url} (whole_website: {whole_website})")
-
-                # IMPROVED: Dynamic progress tracking based on analysis type
-                total_steps = 10 if whole_website else 6
-                progress_tracker = ProgressTracker(
-                    total_steps=total_steps,
-                    description=f"{'Whole Website' if whole_website else 'Selective'} SEO Analysis for {website_url}"
-                )
-                
-                with analyses_lock:
-                    analyses[analysis_id]['progress_tracker'] = progress_tracker
-
-                # Step 1: Enhanced Validation
-                progress_tracker.increment("Enhanced validation and caching check")
-                with analyses_lock:
-                    analyses[analysis_id]['progress'] = progress_tracker.get_status()['step_description']
-
-                if not utils.validate_url(website_url):
-                    raise ValueError("Invalid website URL format")
-
-                # Step 2: URL Discovery (for whole website)
-                if whole_website:
-                    progress_tracker.increment("Discovering all website URLs")
-                    with analyses_lock:
-                        analyses[analysis_id]['progress'] = "Discovering all URLs on the website..."
-
-                # Step 3: Enhanced Analysis with new features
-                progress_tracker.increment("Running enhanced SEO analysis with SERP and caching")
-                with analyses_lock:
-                    analyses[analysis_id]['progress'] = f"Analyzing website ({'whole site' if whole_website else f'up to {max_pages} pages'})..."
-
-                # FIXED: Force disable cache for fresh analysis
-                result = seo_engine.analyze_website(
-                    website_url,
-                    target_keyword,
-                    max_pages,
-                    whole_website=whole_website,
-                    force_fresh=True  # Force fresh analysis
-                )
-
-                # Step 4: Enhanced Processing
-                progress_tracker.increment("Processing enhanced analysis results and generating insights")
-                with analyses_lock:
-                    analyses[analysis_id]['progress'] = progress_tracker.get_status()['step_description']
-
-                # Step 5: Report Generation
-                progress_tracker.increment("Generating comprehensive enhanced reports and CSV export")
-                with analyses_lock:
-                    analyses[analysis_id]['progress'] = progress_tracker.get_status()['step_description']
-
-                # Enhanced file saving
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                safe_url = utils.sanitize_filename(website_url)
-                filename = f"enhanced_seo_audit_{safe_url}_{timestamp}.md"
-                reports_dir = Path("reports")
-                reports_dir.mkdir(parents=True, exist_ok=True)
-                filepath = reports_dir / filename
-
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(result['report'])
-
-                # Step 6: Finalization
-                progress_tracker.increment("Finalizing enhanced analysis and preparing exports")
-
-                # Enhanced completion data
-                pages_analyzed = result['metadata'].get('pages_analyzed', 0)
-                analysis_type = 'Whole Website' if whole_website else 'Selective'
-                
-                final_update = {
-                    'status': 'completed',
-                    'progress': f'🎉 Enhanced SEO analysis completed successfully! Analyzed {pages_analyzed} pages.',
-                    'report': result['report'],
-                    'metadata': result['metadata'],
-                    'filename': filename,
-                    'filepath': str(filepath),
-                    'csv_data_path': result.get('csv_data'),
-                    'completed_at': datetime.now().isoformat(),
-                    'file_size': len(result['report']),
-                    'duration': progress_tracker.get_status()['elapsed_time'],
-                    'enhanced_features_used': {
-                        'whole_website': whole_website,
-                        'analysis_type': analysis_type,
-                        'serp_analysis': result['metadata'].get('serp_results_count', 0) > 0,
-                        'cached_pages': result['metadata'].get('cached_pages', 0),
-                        'fresh_pages': pages_analyzed - result['metadata'].get('cached_pages', 0),
-                        'total_data_transferred': result['metadata'].get('total_data_transferred', 0)
-                    }
-                }
-
-                with analyses_lock:
-                    analyses[analysis_id].update(final_update)
-
-                logger.info(f"✅ Enhanced analysis {analysis_id} completed successfully! "
-                          f"Analyzed {pages_analyzed} pages in {utils.format_duration(progress_tracker.get_status()['elapsed_time'])}")
-
-            except Exception as e:
-                error_msg = str(e)
-                logger.error(f"❌ Enhanced analysis {analysis_id} failed: {error_msg}")
-                with analyses_lock:
-                    if analysis_id in analyses:
-                        analyses[analysis_id].update({
-                            'status': 'error',
-                            'progress': f'Enhanced analysis failed: {error_msg}',
-                            'error': error_msg,
-                            'failed_at': datetime.now().isoformat()
-                        })
-            finally:
-                if analysis_id in self.active_analyses:
-                    del self.active_analyses[analysis_id]
-
-        # Start enhanced analysis thread
-        thread = Thread(target=run_enhanced_analysis, daemon=True)
-        self.active_analyses[analysis_id] = thread
-        thread.start()
-        logger.info(f"Started enhanced analysis thread for {analysis_id}")
-
-# Initialize components
-analysis_manager = EnhancedAnalysisManager()
-rate_limiter = RateLimiter(max_requests=config.rate_limit_requests, window_minutes=config.rate_limit_window)
-
-# Routes
 @app.route('/')
 def index():
-    """Enhanced main page"""
-    return render_template('index.html')
+    """Main application page"""
+    try:
+        # Get recent analyses for the current session
+        recent_analyses = get_recent_analyses(limit=5)
+        return render_template('index.html', recent_analyses=recent_analyses)
+    except Exception as e:
+        logger.error(f"Error loading index page: {str(e)}")
+        return render_template('index.html', recent_analyses=[])
+
+def get_recent_analyses(limit=10):
+    """Get recent analyses from database"""
+    try:
+        conn = sqlite3.connect('cache/seo_analysis.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, website_url, target_keyword, analysis_type, status, 
+                   created_at, completed_at, pages_analyzed, total_pages
+            FROM analysis_sessions 
+            WHERE status = 'completed'
+            ORDER BY created_at DESC 
+            LIMIT ?
+        ''', (limit,))
+        
+        analyses = []
+        for row in cursor.fetchall():
+            analysis = {
+                'id': row[0],
+                'website_url': row[1],
+                'target_keyword': row[2],
+                'analysis_type': row[3],
+                'status': row[4],
+                'created_at': row[5],
+                'completed_at': row[6],
+                'pages_analyzed': row[7],
+                'total_pages': row[8]
+            }
+            analyses.append(analysis)
+        
+        conn.close()
+        return analyses
+    except Exception as e:
+        logger.error(f"Error getting recent analyses: {str(e)}")
+        return []
 
 @app.route('/api/analyze', methods=['POST'])
-def start_analysis_endpoint():
-    """Enhanced SEO analysis endpoint with FUNCTIONAL features"""
+def start_analysis():
+    """Start SEO analysis"""
     try:
         # Rate limiting check
-        if not rate_limiter.is_allowed():
-            retry = rate_limiter.time_until_allowed()
-            return jsonify({'error': 'Rate limit exceeded', 'retry_after_seconds': retry}), 429
+        client_ip = get_client_ip(request)
+        if not rate_limit_check(client_ip):
+            return jsonify({
+                'error': 'Rate limit exceeded',
+                'message': 'Please wait before starting another analysis'
+            }), 429
 
-        # Parse enhanced request data
-        data = request.get_json(silent=True)
+        # Get and validate request data
+        data = request.get_json()
         if not data:
-            return jsonify({'error': 'No JSON data provided'}), 400
+            raise BadRequest("No JSON data provided")
 
-        # Required fields validation
-        required_fields = ['website_url', 'target_keyword']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+        # Validate parameters
+        validation_result = validate_analysis_params(data)
+        if not validation_result['valid']:
+            return jsonify({'error': validation_result['message']}), 400
 
-        website_url = data.get('website_url', '').strip()
-        target_keyword = data.get('target_keyword', '').strip()
-
-        # Enhanced parameters
+        website_url = data['website_url']
+        target_keyword = data.get('target_keyword', '')
         max_pages = int(data.get('max_pages', 10))
         whole_website = data.get('whole_website', False)
         serp_analysis = data.get('serp_analysis', True)
         use_cache = data.get('use_cache', True)
 
-        # Validation
-        if not website_url or not target_keyword:
-            return jsonify({'error': 'Website URL and target keyword cannot be empty'}), 400
+        # Check if analysis already exists and is running
+        with analysis_lock:
+            analysis_id = str(uuid.uuid4())
+            
+            # Store analysis info
+            conn = sqlite3.connect('cache/seo_analysis.db')
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO analysis_sessions 
+                (id, website_url, target_keyword, analysis_type, client_ip, total_pages)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                analysis_id, website_url, target_keyword,
+                'whole_website' if whole_website else 'selective',
+                client_ip, max_pages
+            ))
+            conn.commit()
+            conn.close()
 
-        try:
-            website_url = utils.normalize_url(website_url)
-            if not utils.validate_url(website_url):
-                raise ValueError("Invalid URL format")
-        except Exception as e:
-            return jsonify({'error': f'Invalid website URL: {str(e)}'}), 400
+            # Start analysis in background
+            analysis_config = {
+                'analysis_id': analysis_id,
+                'website_url': website_url,
+                'target_keyword': target_keyword,
+                'max_pages': max_pages,
+                'whole_website': whole_website,
+                'serp_analysis': serp_analysis,
+                'use_cache': use_cache,
+                'client_ip': client_ip
+            }
+            
+            active_analyses[analysis_id] = {
+                'status': 'running',
+                'progress': 0,
+                'message': 'Starting analysis...',
+                'created_at': datetime.now(),
+                'config': analysis_config
+            }
 
-        # IMPROVED: Better limits for whole website analysis
-        if whole_website:
-            max_pages = min(max_pages, 500)  # Increased limit for whole website
-            logger.info(f"Whole website analysis requested for {website_url} (limit: {max_pages} pages)")
-        else:
-            max_pages = min(max(1, max_pages), config.max_pages_limit)
-            logger.info(f"Selective analysis requested for {website_url} ({max_pages} pages)")
+        # Start analysis in background thread
+        executor = ThreadPoolExecutor(max_workers=1)
+        executor.submit(run_analysis_background, analysis_config)
 
-        # Generate enhanced analysis ID
-        analysis_id = str(uuid.uuid4())
-
-        # Create enhanced analysis record
-        initial_record = {
-            'id': analysis_id,
-            'website_url': website_url,
-            'target_keyword': target_keyword,
-            'max_pages': max_pages,
-            'whole_website': whole_website,
-            'serp_analysis': serp_analysis,
-            'use_cache': use_cache,
-            'status': 'queued',
-            'progress': f'Enhanced {"whole website" if whole_website else "selective"} analysis queued for processing...',
-            'started_at': datetime.now().isoformat(),
-            'user_agent': request.headers.get('User-Agent', ''),
-            'client_ip': request.remote_addr,
-            'created_at': datetime.now().isoformat(),
-            'enhanced_features': True,
-            'analysis_type': 'whole_website' if whole_website else 'selective'
-        }
-
-        with analyses_lock:
-            analyses[analysis_id] = initial_record
-
-        time.sleep(0.1)  # Ensure record creation
-
-        # Start enhanced analysis
-        analysis_manager.start_enhanced_analysis(
-            analysis_id, website_url, target_keyword, max_pages, whole_website
-        )
-
-        logger.info(f"Started enhanced analysis {analysis_id} for {website_url} "
-                   f"(keyword: {target_keyword}, whole_website: {whole_website}, max_pages: {max_pages})")
-
-        # IMPROVED: Better estimated duration
-        estimated_duration = 300 if whole_website else (max_pages * 5)  # 5 minutes for whole site minimum
-        
         return jsonify({
             'analysis_id': analysis_id,
             'status': 'started',
-            'message': f'Enhanced {"whole website" if whole_website else "selective"} SEO analysis started successfully',
-            'check_status_url': url_for('check_status', analysis_id=analysis_id),
-            'estimated_duration_seconds': estimated_duration,
-            'max_pages': max_pages,
-            'whole_website': whole_website,
+            'message': 'Analysis started successfully',
+            'check_status_url': f'/api/status/{analysis_id}',
+            'analysis_type': 'whole_website' if whole_website else 'selective',
             'enhanced_features': True,
-            'serp_analysis_enabled': serp_analysis,
-            'caching_enabled': use_cache,
-            'analysis_type': 'whole_website' if whole_website else 'selective'
-        }), 202
-
-    except Exception as e:
-        logger.error(f"Error starting enhanced analysis: {e}")
-        return jsonify({'error': f'Failed to start enhanced analysis: {str(e)}'}), 500
-
-@app.route('/api/status/<analysis_id>')
-def check_status(analysis_id):
-    """Enhanced status checking with additional metadata"""
-    try:
-        if not analysis_id:
-            return jsonify({'error': 'Missing analysis ID'}), 400
-
-        with analyses_lock:
-            if analysis_id not in analyses:
-                return jsonify({'error': 'Analysis not found', 'analysis_id': analysis_id}), 404
-
-            analysis = analyses[analysis_id].copy()
-
-        # Enhanced progress information
-        if 'progress_tracker' in analysis:
-            try:
-                info = analysis['progress_tracker'].get_status()
-                analysis['progress_info'] = {
-                    'percentage': info['percentage'],
-                    'elapsed_time': utils.format_duration(info['elapsed_time']),
-                    'estimated_remaining': utils.format_duration(info['remaining_time']),
-                    'current_step': info['current_step'],
-                    'total_steps': info['total_steps']
-                }
-                del analysis['progress_tracker']  # Don't serialize the tracker
-            except Exception as e:
-                logger.warning(f"Error processing enhanced progress tracker for {analysis_id}: {e}")
-
-        # Enhanced metadata for completed analysis
-        if analysis.get('status') == 'completed' and 'enhanced_features_used' in analysis:
-            features = analysis['enhanced_features_used']
-            analysis['enhanced_summary'] = {
-                'analysis_type': features.get('analysis_type', 'selective'),
-                'whole_website_analysis': features.get('whole_website', False),
-                'serp_results_found': features.get('serp_analysis', False),
-                'pages_from_cache': features.get('cached_pages', 0),
-                'fresh_pages_analyzed': features.get('fresh_pages', 0),
-                'data_transferred_mb': features.get('total_data_transferred', 0) / 1024 / 1024,
-                'has_csv_export': bool(analysis.get('csv_data_path'))
-            }
-
-        # Don't return full report in status (too large)
-        if 'report' in analysis:
-            analysis['has_report'] = True
-            preview = analysis['report'][:300] + '...' if len(analysis['report']) > 300 else analysis['report']
-            analysis['report_preview'] = preview
-            del analysis['report']
-
-        # Enhanced timing information
-        if 'started_at' in analysis:
-            try:
-                started = datetime.fromisoformat(analysis['started_at'])
-                elapsed = datetime.now() - started
-                analysis['elapsed_seconds'] = int(elapsed.total_seconds())
-                analysis['elapsed_formatted'] = utils.format_duration(elapsed.total_seconds())
-            except Exception as e:
-                logger.warning(f"Error calculating enhanced timing for {analysis_id}: {e}")
-
-        analysis['status_check_timestamp'] = datetime.now().isoformat()
-        analysis['enhanced_features_active'] = True
-
-        return jsonify(analysis)
-
-    except Exception as e:
-        logger.error(f"Error in enhanced status check for {analysis_id}: {e}")
-        return jsonify({
-            'error': 'Internal server error',
-            'analysis_id': analysis_id,
-            'enhanced_debug_info': str(e) if config.environment == 'development' else None
-        }), 500
-
-@app.route('/api/report/<analysis_id>')
-def get_report(analysis_id):
-    """Get enhanced analysis report"""
-    try:
-        if not analysis_id:
-            return jsonify({'error': 'Missing analysis ID'}), 400
-
-        with analyses_lock:
-            if analysis_id not in analyses:
-                return jsonify({'error': 'Analysis not found'}), 404
-
-            analysis = analyses[analysis_id]
-
-        if analysis.get('status') != 'completed':
-            return jsonify({'error': 'Analysis not completed yet'}), 400
-
-        return jsonify({
-            'analysis_id': analysis_id,
-            'report': analysis.get('report', ''),
-            'metadata': analysis.get('metadata', {}),
-            'enhanced_features': analysis.get('enhanced_features_used', {}),
-            'generated_at': analysis.get('completed_at'),
-            'file_info': {
-                'filename': analysis.get('filename'),
-                'size_bytes': analysis.get('file_size', 0)
-            }
+            'caching_enabled': use_cache
         })
 
     except Exception as e:
-        logger.error(f"Error getting enhanced report for {analysis_id}: {e}")
-        return jsonify({'error': f'Failed to get report: {str(e)}'}), 500
+        logger.error(f"Error starting analysis: {str(e)}")
+        return jsonify({
+            'error': 'Analysis failed to start',
+            'message': str(e)
+        }), 500
+
+def run_analysis_background(config):
+    """Run analysis in background thread"""
+    analysis_id = config['analysis_id']
+    
+    try:
+        logger.info(f"Starting background analysis {analysis_id}")
+        
+        # Update status
+        active_analyses[analysis_id]['status'] = 'running'
+        active_analyses[analysis_id]['message'] = 'Initializing analyzer...'
+        
+        # Initialize analyzer
+        analyzer = EnhancedSEOAnalyzer(
+            max_concurrent_requests=config.get('max_concurrent_requests', 5),
+            request_timeout=config.get('request_timeout', 30),
+            use_cache=config['use_cache']
+        )
+        
+        # Run analysis
+        active_analyses[analysis_id]['message'] = 'Running analysis...'
+        
+        if config['whole_website']:
+            results = asyncio.run(analyzer.analyze_whole_website(
+                config['website_url'],
+                config['target_keyword'],
+                max_pages=config['max_pages'],
+                serp_analysis=config['serp_analysis'],
+                progress_callback=lambda p, m: update_analysis_progress(analysis_id, p, m)
+            ))
+        else:
+            results = asyncio.run(analyzer.analyze_website_selective(
+                config['website_url'],
+                config['target_keyword'],
+                max_pages=config['max_pages'],
+                serp_analysis=config['serp_analysis'],
+                progress_callback=lambda p, m: update_analysis_progress(analysis_id, p, m)
+            ))
+
+        # Generate CSV export
+        active_analyses[analysis_id]['message'] = 'Generating reports...'
+        csv_path = generate_csv_report(results, analysis_id)
+        
+        # Update database with results
+        conn = sqlite3.connect('cache/seo_analysis.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE analysis_sessions 
+            SET status = 'completed', completed_at = CURRENT_TIMESTAMP, 
+                result_data = ?, csv_file_path = ?, pages_analyzed = ?
+            WHERE id = ?
+        ''', (
+            json.dumps(results, default=str),
+            csv_path,
+            len(results.get('pages', [])),
+            analysis_id
+        ))
+        conn.commit()
+        conn.close()
+        
+        # Update active analysis
+        active_analyses[analysis_id].update({
+            'status': 'completed',
+            'progress': 100,
+            'message': 'Analysis completed successfully',
+            'completed_at': datetime.now(),
+            'results': results,
+            'csv_path': csv_path
+        })
+        
+        logger.info(f"Analysis {analysis_id} completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Analysis {analysis_id} failed: {str(e)}")
+        
+        # Update database with error
+        conn = sqlite3.connect('cache/seo_analysis.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE analysis_sessions 
+            SET status = 'failed', error_message = ?
+            WHERE id = ?
+        ''', (str(e), analysis_id))
+        conn.commit()
+        conn.close()
+        
+        # Update active analysis
+        active_analyses[analysis_id].update({
+            'status': 'failed',
+            'message': f'Analysis failed: {str(e)}',
+            'error': str(e)
+        })
+
+def update_analysis_progress(analysis_id, progress, message):
+    """Update analysis progress"""
+    if analysis_id in active_analyses:
+        active_analyses[analysis_id].update({
+            'progress': progress,
+            'message': message
+        })
+
+@app.route('/api/status/<analysis_id>')
+def get_analysis_status(analysis_id):
+    """Get analysis status"""
+    try:
+        # Check active analyses first
+        if analysis_id in active_analyses:
+            analysis = active_analyses[analysis_id]
+            elapsed = datetime.now() - analysis['created_at']
+            
+            return jsonify({
+                'analysis_id': analysis_id,
+                'status': analysis['status'],
+                'progress': analysis.get('progress', 0),
+                'message': analysis.get('message', ''),
+                'elapsed_seconds': int(elapsed.total_seconds()),
+                'elapsed_formatted': format_elapsed_time(elapsed.total_seconds()),
+                'created_at': analysis['created_at'].isoformat(),
+                'analysis_type': analysis['config'].get('analysis_type', 'selective'),
+                'client_ip': analysis['config'].get('client_ip', ''),
+                'pages_analyzed': analysis.get('pages_analyzed', 0)
+            })
+        
+        # Check database for completed analyses
+        conn = sqlite3.connect('cache/seo_analysis.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT status, created_at, completed_at, pages_analyzed, 
+                   total_pages, analysis_type, client_ip, error_message
+            FROM analysis_sessions WHERE id = ?
+        ''', (analysis_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return jsonify({'error': 'Analysis not found'}), 404
+            
+        created_at = datetime.fromisoformat(row[1])
+        completed_at = datetime.fromisoformat(row[2]) if row[2] else None
+        elapsed = (completed_at or datetime.now()) - created_at
+        
+        return jsonify({
+            'analysis_id': analysis_id,
+            'status': row[0],
+            'pages_analyzed': row[3] or 0,
+            'total_pages': row[4] or 0,
+            'analysis_type': row[5],
+            'client_ip': row[6],
+            'created_at': row[1],
+            'completed_at': row[2],
+            'elapsed_seconds': int(elapsed.total_seconds()),
+            'elapsed_formatted': format_elapsed_time(elapsed.total_seconds()),
+            'error_message': row[7]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting analysis status: {str(e)}")
+        return jsonify({'error': 'Failed to get analysis status'}), 500
+
+@app.route('/api/report/<analysis_id>')
+def get_analysis_report(analysis_id):
+    """Get analysis report"""
+    try:
+        # Check active analyses first
+        if analysis_id in active_analyses and 'results' in active_analyses[analysis_id]:
+            results = active_analyses[analysis_id]['results']
+            return jsonify({
+                'analysis_id': analysis_id,
+                'status': 'completed',
+                'results': results,
+                'generated_at': active_analyses[analysis_id]['completed_at'].isoformat(),
+                'enhanced_features': True,
+                'file_info': {
+                    'csv_available': bool(active_analyses[analysis_id].get('csv_path')),
+                    'csv_path': active_analyses[analysis_id].get('csv_path')
+                }
+            })
+        
+        # Check database
+        conn = sqlite3.connect('cache/seo_analysis.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT result_data, completed_at, csv_file_path, status 
+            FROM analysis_sessions WHERE id = ?
+        ''', (analysis_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return jsonify({'error': 'Analysis not found'}), 404
+            
+        if row[3] != 'completed':
+            return jsonify({'error': 'Analysis not completed yet'}), 400
+            
+        results = json.loads(row[0]) if row[0] else {}
+        
+        return jsonify({
+            'analysis_id': analysis_id,
+            'status': 'completed',
+            'results': results,
+            'generated_at': row[1],
+            'enhanced_features': True,
+            'file_info': {
+                'csv_available': bool(row[2]),
+                'csv_path': row[2]
+            },
+            'metadata': {
+                'total_pages': len(results.get('pages', [])),
+                'analysis_type': results.get('analysis_type', 'unknown')
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting analysis report: {str(e)}")
+        return jsonify({'error': 'Failed to get analysis report'}), 500
+
+@app.route('/api/recent-analyses')
+def get_recent_analyses_api():
+    """Get recent analyses via API"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        recent = get_recent_analyses(limit)
+        return jsonify({'analyses': recent})
+    except Exception as e:
+        logger.error(f"Error getting recent analyses: {str(e)}")
+        return jsonify({'error': 'Failed to get recent analyses'}), 500
+
+@app.route('/api/cancel/<analysis_id>', methods=['POST'])
+def cancel_analysis(analysis_id):
+    """Cancel running analysis"""
+    try:
+        if analysis_id in active_analyses:
+            active_analyses[analysis_id]['status'] = 'cancelled'
+            active_analyses[analysis_id]['message'] = 'Analysis cancelled by user'
+            
+            # Update database
+            conn = sqlite3.connect('cache/seo_analysis.db')
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE analysis_sessions 
+                SET status = 'cancelled' 
+                WHERE id = ?
+            ''', (analysis_id,))
+            conn.commit()
+            conn.close()
+            
+            return jsonify({'message': 'Analysis cancelled successfully'})
+        else:
+            return jsonify({'error': 'Analysis not found or already completed'}), 404
+            
+    except Exception as e:
+        logger.error(f"Error cancelling analysis: {str(e)}")
+        return jsonify({'error': 'Failed to cancel analysis'}), 500
+
+def generate_csv_report(results, analysis_id):
+    """Generate CSV report from analysis results"""
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"seo_comprehensive_analysis_{timestamp}.csv"
+        filepath = os.path.join('exports', filename)
+        
+        # Prepare data for CSV
+        pages_data = []
+        for page in results.get('pages', []):
+            row = {
+                'URL': page.get('url', ''),
+                'Title': page.get('title', ''),
+                'Meta Description': page.get('meta_description', ''),
+                'H1': page.get('h1', ''),
+                'Status Code': page.get('status_code', ''),
+                'Word Count': page.get('word_count', 0),
+                'Load Time': page.get('load_time', 0),
+                'SEO Score': page.get('seo_score', 0),
+                'Issues': ', '.join(page.get('issues', [])),
+                'Target Keyword Density': page.get('target_keyword_density', 0),
+                'Internal Links': len(page.get('internal_links', [])),
+                'External Links': len(page.get('external_links', [])),
+                'Images': len(page.get('images', [])),
+                'Images Missing Alt': len([img for img in page.get('images', []) if not img.get('alt')])
+            }
+            pages_data.append(row)
+        
+        # Create DataFrame and save CSV
+        df = pd.DataFrame(pages_data)
+        df.to_csv(filepath, index=False, encoding='utf-8')
+        
+        logger.info(f"CSV report generated: {filepath}")
+        return filepath
+        
+    except Exception as e:
+        logger.error(f"Error generating CSV report: {str(e)}")
+        return None
 
 @app.route('/api/download-csv/<analysis_id>')
 def download_csv(analysis_id):
-    """Download enhanced CSV export"""
+    """Download CSV report"""
     try:
-        if not analysis_id:
-            return jsonify({'error': 'Missing analysis ID'}), 400
-
-        with analyses_lock:
-            if analysis_id not in analyses:
-                return jsonify({'error': 'Analysis not found'}), 404
-
-            analysis = analyses[analysis_id]
-
-        if analysis.get('status') != 'completed':
-            return jsonify({'error': 'Analysis not completed yet'}), 400
-
-        csv_path = analysis.get('csv_data_path')
-        if not csv_path or not os.path.exists(csv_path):
-            return jsonify({'error': 'Enhanced CSV export not available'}), 404
-
-        return send_file(
-            csv_path,
-            as_attachment=True,
-            download_name=f"enhanced_seo_analysis_{analysis_id}.csv",
-            mimetype='text/csv'
-        )
-
+        # Check active analyses first
+        if analysis_id in active_analyses and 'csv_path' in active_analyses[analysis_id]:
+            csv_path = active_analyses[analysis_id]['csv_path']
+            if csv_path and os.path.exists(csv_path):
+                return send_file(csv_path, as_attachment=True)
+        
+        # Check database
+        conn = sqlite3.connect('cache/seo_analysis.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT csv_file_path FROM analysis_sessions WHERE id = ?', (analysis_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row and row[0] and os.path.exists(row[0]):
+            return send_file(row[0], as_attachment=True)
+        else:
+            return jsonify({'error': 'CSV file not found'}), 404
+            
     except Exception as e:
-        logger.error(f"Error downloading enhanced CSV for {analysis_id}: {e}")
-        return jsonify({'error': f'Failed to download CSV: {str(e)}'}), 500
+        logger.error(f"Error downloading CSV: {str(e)}")
+        return jsonify({'error': 'Failed to download CSV'}), 500
 
 @app.route('/api/health')
 def health_check():
-    """Enhanced health check endpoint"""
+    """System health check"""
     try:
-        # Basic health checks
-        health_status = {
+        # Check database connection
+        conn = sqlite3.connect('cache/seo_analysis.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM analysis_sessions')
+        total_analyses = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM page_cache')
+        cached_pages = cursor.fetchone()[0]
+        conn.close()
+        
+        # Check active analyses
+        active_count = len([a for a in active_analyses.values() if a['status'] == 'running'])
+        
+        return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
-            'version': '3.0-enhanced-functional',
-            'enhanced_features': True
-        }
-
-        # Enhanced system checks
-        health_status['system'] = {
-            'active_analyses': len(analysis_manager.active_analyses),
-            'total_analyses': len(analyses),
-            'cache_enabled': True,
-            'serp_analysis': config.serp_analysis_enabled,
-            'rate_limiting': True,
-            'whole_website_support': True
-        }
-
-        # Cache health check
-        try:
-            with sqlite3.connect(cache_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM page_cache")
-                cached_pages = cursor.fetchone()[0]
-                health_status['cache'] = {
-                    'total_pages': cached_pages,
-                    'status': 'operational'
+            'database': 'connected',
+            'statistics': {
+                'total_analyses': total_analyses,
+                'cached_pages': cached_pages,
+                'active_analyses': active_count,
+                'config': {
+                    'max_concurrent_requests': config.get('max_concurrent_requests', 5),
+                    'cache_enabled': config.get('cache_enabled', True),
+                    'serp_analysis_enabled': config.get('serp_analysis_enabled', True)
                 }
-        except Exception as e:
-            health_status['cache'] = {
-                'status': 'error',
-                'error': str(e)
             }
-
-        return jsonify(health_status)
-
+        })
+        
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error(f"Health check failed: {str(e)}")
         return jsonify({
             'status': 'unhealthy',
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         }), 500
 
-@app.route('/api/admin/cache-stats')
-def get_cache_statistics():
-    """Get enhanced caching statistics"""
-    try:
-        # Get cache statistics from SQLite
-        with sqlite3.connect(cache_manager.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # Total cached pages
-            cursor.execute("SELECT COUNT(*) FROM page_cache")
-            total_cached = cursor.fetchone()[0]
-            
-            # Cache by domain
-            cursor.execute("SELECT domain, COUNT(*) FROM page_cache GROUP BY domain ORDER BY COUNT(*) DESC LIMIT 10")
-            cache_by_domain = cursor.fetchall()
-            
-            # Recent cache activity
-            cursor.execute("""
-                SELECT COUNT(*) FROM page_cache
-                WHERE datetime(last_accessed) > datetime('now', '-24 hours')
-            """)
-            recent_access = cursor.fetchone()[0]
-
-            # Cache hit statistics
-            cursor.execute("SELECT AVG(analysis_count) FROM page_cache")
-            avg_reuse = cursor.fetchone()[0] or 0
-
-        return jsonify({
-            'cache_statistics': {
-                'total_cached_pages': total_cached,
-                'recent_access_24h': recent_access,
-                'average_reuse_count': round(avg_reuse, 2),
-                'top_domains': [{'domain': domain, 'pages': count} for domain, count in cache_by_domain],
-                'cache_efficiency': round((recent_access / max(total_cached, 1)) * 100, 1)
-            }
-        })
-
-    except Exception as e:
-        logger.error(f"Error getting cache statistics: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/clear-cache', methods=['POST'])
-def clear_cache():
-    """Clear SEO analysis cache"""
-    try:
-        # Get current cache size
-        with sqlite3.connect(cache_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM page_cache")
-            before_count = cursor.fetchone()[0]
-
-            # Clear cache
-            cursor.execute("DELETE FROM page_cache")
-            cursor.execute("DELETE FROM analysis_sessions")
-            cursor.execute("SELECT COUNT(*) FROM page_cache")
-            after_count = cursor.fetchone()[0]
-
-        return jsonify({
-            'message': 'Cache cleared successfully',
-            'pages_cleared': before_count - after_count,
-            'remaining_pages': after_count
-        })
-
-    except Exception as e:
-        logger.error(f"Error clearing cache: {e}")
-        return jsonify({'error': str(e)}), 500
-
+# Error handlers
 @app.errorhandler(404)
 def not_found(error):
-    return jsonify({'error': 'Endpoint not found'}), 404
+    return jsonify({'error': 'Not found'}), 404
 
 @app.errorhandler(500)
 def internal_error(error):
-    logger.error(f"Internal server error: {error}")
     return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
-    # Ensure directories exist
-    os.makedirs('logs', exist_ok=True)
-    os.makedirs('reports', exist_ok=True)
-    os.makedirs('exports', exist_ok=True)
-    os.makedirs('cache', exist_ok=True)
-
-    # For local development only
-    port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV') == 'development'
-
-    logger.info(f"🚀 Starting Enhanced SEO Audit Tool V3.0 FUNCTIONAL on port {port}")
-    logger.info(f"🔧 Debug mode: {debug}")
-    logger.info(f"📊 Enhanced features: SERP analysis, Smart caching, FUNCTIONAL Whole website analysis")
-
-    app.run(host='0.0.0.0', port=port, debug=debug)
-
-# For gunicorn (production)
-application = app
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV') == 'development'
+    
+    logger.info(f"Starting Enhanced SEO Audit Tool v3.0 on port {port}")
+    logger.info(f"Debug mode: {debug}")
+    
+    app.run(host='0.0.0.0', port=port, debug=debug, threaded=True)
