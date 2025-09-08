@@ -1,736 +1,612 @@
 /**
- * Enhanced SEO Audit Tool V3.0 - JavaScript
- * Advanced frontend functionality with enhanced features
+ * Enhanced SEO Audit Tool V3.0 - Complete JavaScript Implementation
+ * Production-ready frontend with progress tracking and error handling
  */
 
-// Global variables
-let currentAnalysisId = null;
-let progressInterval = null;
-let statusCheckRetries = 0;
-const MAX_STATUS_RETRIES = 10;
+console.log("🎯 Enhanced SEO Audit Tool V3.0 JavaScript loaded successfully!");
 
-// Enhanced configuration
+// Configuration and State Management
 const CONFIG = {
-    statusCheckInterval: 3000,
-    maxRetries: 10,
-    timeoutDuration: 300000, // 5 minutes
-    endpoints: {
-        analyze: '/api/analyze',
-        status: '/api/status',
-        report: '/api/report',
-        downloadCsv: '/api/download-csv',
-        health: '/api/health',
-        cacheStats: '/api/admin/cache-stats',
-        clearCache: '/api/admin/clear-cache'
-    }
+    API_BASE: window.location.origin,
+    STATUS_POLL_INTERVAL: 3000,
+    MAX_RETRIES: 3,
+    RETRY_DELAY: 2000
 };
 
-// Enhanced Form Handling
+const ANALYSIS_STATE = {
+    currentAnalysisId: null,
+    isRunning: false,
+    statusPolling: null,
+    retryCount: 0
+};
+
+// DOM Elements (will be initialized when DOM loads)
+let DOM = {};
+
+// Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Enhanced SEO Audit Tool V3.0 loaded successfully!');
-
-    // Initialize components
-    initializeEnhancedForm();
-    initializeAnalysisTypeSelection();
-    initializeAdvancedOptions();
-
-    // Check system health
-    checkSystemHealth();
+    console.log("🚀 Enhanced SEO Audit Tool V3.0 loaded successfully!");
+    initializeDOMElements();
+    setupEventListeners();
+    performHealthCheck();
+    updateUI();
 });
 
-function initializeEnhancedForm() {
-    const analysisForm = document.getElementById('analysis-form');
-    if (analysisForm) {
-        analysisForm.addEventListener('submit', handleEnhancedFormSubmit);
-
-        // Enhanced form validation
-        const inputs = analysisForm.querySelectorAll('input[required]');
-        inputs.forEach(input => {
-            input.addEventListener('blur', validateField);
-            input.addEventListener('input', clearFieldError);
-        });
-    }
+function initializeDOMElements() {
+    DOM = {
+        // Form elements
+        seoForm: document.getElementById('enhanced-seo-form'),
+        websiteUrlInput: document.getElementById('website-url'),
+        targetKeywordInput: document.getElementById('target-keyword'),
+        maxPagesInput: document.getElementById('max-pages'),
+        wholeWebsiteToggle: document.getElementById('whole-website'),
+        serpAnalysisToggle: document.getElementById('serp-analysis'),
+        
+        // UI sections
+        formSection: document.getElementById('form-section'),
+        progressSection: document.getElementById('progress-section'),
+        resultsSection: document.getElementById('results-section'),
+        
+        // Progress elements
+        progressBar: document.getElementById('progress-bar'),
+        progressFill: document.getElementById('progress-fill'),
+        progressText: document.getElementById('progress-text'),
+        progressDetails: document.getElementById('progress-details'),
+        
+        // Results elements
+        reportContent: document.getElementById('report-content'),
+        csvDownloadBtn: document.getElementById('csv-download-btn'),
+        
+        // Control buttons
+        startBtn: document.getElementById('start-analysis-btn'),
+        cancelBtn: document.getElementById('cancel-analysis-btn'),
+        newAnalysisBtn: document.getElementById('new-analysis-btn'),
+        
+        // Status elements
+        analysisStatus: document.getElementById('analysis-status'),
+        errorMessage: document.getElementById('error-message'),
+        
+        // Health check
+        systemStatus: document.getElementById('system-status')
+    };
 }
 
-function initializeAnalysisTypeSelection() {
-    const analysisTypeCards = document.querySelectorAll('.analysis-type-card');
-    const maxPagesSection = document.getElementById('max-pages-section');
-    const wholeWebsiteWarning = document.getElementById('whole-website-warning');
-
-    analysisTypeCards.forEach(card => {
-        card.addEventListener('click', function() {
-            const type = this.dataset.type;
-            const radio = this.querySelector('input[type="radio"]');
-
-            if (radio) {
-                radio.checked = true;
-                updateAnalysisTypeUI(type);
-            }
-        });
-    });
-
-    function updateAnalysisTypeUI(type) {
-        // Update card styling
-        analysisTypeCards.forEach(c => {
-            c.classList.remove('border-primary', 'bg-light');
-        });
-
-        const selectedCard = document.querySelector(`[data-type="${type}"]`);
-        if (selectedCard) {
-            selectedCard.classList.add('border-primary', 'bg-light');
-        }
-
-        // Show/hide sections based on selection
-        if (type === 'whole') {
-            if (maxPagesSection) maxPagesSection.style.display = 'none';
-            if (wholeWebsiteWarning) wholeWebsiteWarning.style.display = 'block';
-        } else {
-            if (maxPagesSection) maxPagesSection.style.display = 'block';
-            if (wholeWebsiteWarning) wholeWebsiteWarning.style.display = 'none';
-        }
+function setupEventListeners() {
+    // Form submission
+    if (DOM.seoForm) {
+        DOM.seoForm.addEventListener('submit', handleEnhancedFormSubmit);
     }
-}
-
-function initializeAdvancedOptions() {
-    const advancedToggle = document.querySelector('[data-bs-target="#advanced-options"]');
-    if (advancedToggle) {
-        advancedToggle.addEventListener('click', function() {
-            const icon = this.querySelector('i');
-            if (icon) {
-                setTimeout(() => {
-                    const isExpanded = document.getElementById('advanced-options').classList.contains('show');
-                    icon.className = isExpanded ? 'fas fa-cog-up me-1' : 'fas fa-cog me-1';
-                }, 200);
-            }
-        });
+    
+    // Control buttons
+    if (DOM.startBtn) {
+        DOM.startBtn.addEventListener('click', handleStartAnalysis);
+    }
+    
+    if (DOM.cancelBtn) {
+        DOM.cancelBtn.addEventListener('click', handleCancelAnalysis);
+    }
+    
+    if (DOM.newAnalysisBtn) {
+        DOM.newAnalysisBtn.addEventListener('click', handleNewAnalysis);
+    }
+    
+    if (DOM.csvDownloadBtn) {
+        DOM.csvDownloadBtn.addEventListener('click', handleCSVDownload);
+    }
+    
+    // Input validation
+    if (DOM.wholeWebsiteToggle) {
+        DOM.wholeWebsiteToggle.addEventListener('change', handleWholeWebsiteToggle);
     }
 }
 
 async function handleEnhancedFormSubmit(event) {
     event.preventDefault();
-
-    const form = event.target;
-    const formData = new FormData(form);
-
-    // Enhanced validation
-    if (!form.checkValidity()) {
-        event.stopPropagation();
-        form.classList.add('was-validated');
-        return;
-    }
-
-    const websiteUrl = formData.get('website_url').trim();
-    const targetKeyword = formData.get('target_keyword').trim();
-    const analysisType = formData.get('analysis_type');
-    const maxPages = analysisType === 'whole' ? null : parseInt(formData.get('max_pages'));
-    const wholeWebsite = analysisType === 'whole';
-
-    // Enhanced validation
-    if (!validateUrl(websiteUrl)) {
-        showFieldError('website_url', 'Please enter a valid website URL');
-        return;
-    }
-
-    if (!validateKeyword(targetKeyword)) {
-        showFieldError('target_keyword', 'Please enter a valid target keyword');
-        return;
-    }
-
-    const requestData = {
-        website_url: websiteUrl,
-        target_keyword: targetKeyword,
-        max_pages: maxPages || 10,
-        whole_website: wholeWebsite,
-        serp_analysis: formData.get('serp_analysis') === 'on',
-        use_cache: formData.get('use_cache') === 'on'
-    };
-
+    console.log("🚀 Starting enhanced analysis...", getFormData());
+    
     try {
-        await startEnhancedAnalysis(requestData);
+        showError(''); // Clear any previous errors
+        
+        const formData = getFormData();
+        const validationResult = validateFormData(formData);
+        
+        if (!validationResult.isValid) {
+            showError(validationResult.message);
+            return;
+        }
+        
+        await startEnhancedAnalysis(formData);
+        
     } catch (error) {
         console.error('Enhanced analysis failed:', error);
-        showError('Failed to start enhanced analysis: ' + error.message);
+        showError(`Analysis failed: ${error.message}`);
+        resetToFormState();
     }
 }
 
-async function startEnhancedAnalysis(data) {
-    console.log('🚀 Starting enhanced analysis...', data);
+async function handleStartAnalysis() {
+    if (DOM.seoForm) {
+        const event = new Event('submit');
+        DOM.seoForm.dispatchEvent(event);
+    }
+}
 
-    // Update UI for enhanced analysis
-    updateUI('starting');
-    showProgress('Initializing enhanced SEO analysis...', 0);
+function handleCancelAnalysis() {
+    console.log("🛑 Cancelling analysis...");
+    
+    // Stop polling
+    if (ANALYSIS_STATE.statusPolling) {
+        clearInterval(ANALYSIS_STATE.statusPolling);
+        ANALYSIS_STATE.statusPolling = null;
+    }
+    
+    // Reset state
+    ANALYSIS_STATE.currentAnalysisId = null;
+    ANALYSIS_STATE.isRunning = false;
+    ANALYSIS_STATE.retryCount = 0;
+    
+    // Reset UI
+    resetToFormState();
+    showError('Analysis cancelled by user.');
+}
 
+function handleNewAnalysis() {
+    console.log("🆕 Starting new analysis...");
+    
+    // Reset state
+    ANALYSIS_STATE.currentAnalysisId = null;
+    ANALYSIS_STATE.isRunning = false;
+    ANALYSIS_STATE.retryCount = 0;
+    
+    // Clear form
+    if (DOM.seoForm) {
+        DOM.seoForm.reset();
+    }
+    
+    // Reset UI
+    resetToFormState();
+    showError('');
+}
+
+function handleWholeWebsiteToggle() {
+    const isWholeWebsite = DOM.wholeWebsiteToggle.checked;
+    const maxPagesGroup = DOM.maxPagesInput?.closest('.form-group');
+    
+    if (maxPagesGroup) {
+        maxPagesGroup.style.opacity = isWholeWebsite ? '0.5' : '1';
+        DOM.maxPagesInput.disabled = isWholeWebsite;
+    }
+}
+
+async function handleCSVDownload() {
+    if (!ANALYSIS_STATE.currentAnalysisId) {
+        showError('No analysis ID available for CSV download');
+        return;
+    }
+    
     try {
-        const response = await fetch(CONFIG.endpoints.analyze, {
+        showMessage('Preparing CSV download...', 'info');
+        
+        const response = await fetch(`${CONFIG.API_BASE}/api/download-csv/${ANALYSIS_STATE.currentAnalysisId}`);
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `seo_analysis_${ANALYSIS_STATE.currentAnalysisId}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showMessage('CSV downloaded successfully!', 'success');
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'CSV download failed');
+        }
+    } catch (error) {
+        console.error('CSV download error:', error);
+        showError(`CSV download failed: ${error.message}`);
+    }
+}
+
+function getFormData() {
+    return {
+        website_url: DOM.websiteUrlInput?.value?.trim() || '',
+        target_keyword: DOM.targetKeywordInput?.value?.trim() || '',
+        max_pages: parseInt(DOM.maxPagesInput?.value) || 10,
+        whole_website: DOM.wholeWebsiteToggle?.checked || false,
+        serp_analysis: DOM.serpAnalysisToggle?.checked !== false,
+        use_cache: true
+    };
+}
+
+function validateFormData(data) {
+    if (!data.website_url) {
+        return { isValid: false, message: 'Please enter a website URL' };
+    }
+    
+    if (!data.target_keyword) {
+        return { isValid: false, message: 'Please enter a target keyword' };
+    }
+    
+    // URL validation
+    try {
+        new URL(data.website_url);
+    } catch (e) {
+        return { isValid: false, message: 'Please enter a valid URL' };
+    }
+    
+    // Pages validation
+    if (!data.whole_website && (data.max_pages < 1 || data.max_pages > 100)) {
+        return { isValid: false, message: 'Pages to analyze must be between 1 and 100' };
+    }
+    
+    return { isValid: true };
+}
+
+async function startEnhancedAnalysis(formData) {
+    try {
+        showProgressState();
+        updateProgress(0, 'Starting analysis...', 'Initializing enhanced SEO analysis');
+        
+        ANALYSIS_STATE.isRunning = true;
+        ANALYSIS_STATE.retryCount = 0;
+        
+        const response = await fetchWithRetry(`${CONFIG.API_BASE}/api/analyze`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(formData)
         });
-
+        
         if (!response.ok) {
-            // Handle different error types
-            if (response.status === 502) {
-                throw new Error('Server is temporarily unavailable. Please try again in a few minutes.');
+            const errorText = await response.text();
+            let errorMessage;
+            
+            try {
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+            } catch (e) {
+                // Response is not JSON (likely HTML error page)
+                if (errorText.includes('<!DOCTYPE')) {
+                    errorMessage = `Server error (${response.status}). The service may be temporarily unavailable.`;
+                } else {
+                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                }
             }
             
-            let errorMessage;
-            try {
-                const result = await response.json();
-                errorMessage = result.error || `HTTP ${response.status}: ${response.statusText}`;
-            } catch (e) {
-                errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-            }
             throw new Error(errorMessage);
         }
-
+        
         const result = await response.json();
-        currentAnalysisId = result.analysis_id;
-        console.log(`✅ Enhanced analysis started: ${currentAnalysisId}`);
-
-        updateUI('running');
-
-        // Enhanced progress polling
-        setTimeout(() => {
-            startEnhancedProgressPolling();
-        }, 2000);
-
-        // Update progress based on analysis type
-        if (data.whole_website) {
-            showProgress('Starting comprehensive website discovery...', 5);
-            updateProgressDetails('Discovering all pages on your website...');
-        } else {
-            showProgress(`Analyzing ${data.max_pages} pages with enhanced features...`, 5);
-            updateProgressDetails('Enhanced crawling with caching enabled...');
-        }
-
+        console.log("✅ Enhanced analysis started:", result.analysis_id);
+        
+        ANALYSIS_STATE.currentAnalysisId = result.analysis_id;
+        
+        // Show initial progress
+        updateProgress(5, 'Analysis Started', 'Enhanced SEO analysis has been queued for processing');
+        
+        // Start polling for updates
+        startStatusPolling();
+        
     } catch (error) {
-        console.error('❌ Enhanced analysis failed:', error);
-        updateUI('idle');
+        console.error("❌ Enhanced analysis failed:", error);
         throw error;
     }
 }
 
-function startEnhancedProgressPolling() {
-    if (progressInterval) {
-        clearInterval(progressInterval);
-    }
-
-    progressInterval = setInterval(async () => {
+async function fetchWithRetry(url, options, retries = CONFIG.MAX_RETRIES) {
+    for (let i = 0; i < retries; i++) {
         try {
-            await checkEnhancedProgress();
+            const response = await fetch(url, options);
+            return response;
         } catch (error) {
-            console.error('❌ Progress check failed:', error);
-            handleProgressError(error);
+            if (i === retries - 1) throw error;
+            await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY * (i + 1)));
         }
-    }, CONFIG.statusCheckInterval);
+    }
 }
 
-async function checkEnhancedProgress() {
-    if (!currentAnalysisId) return;
+function startStatusPolling() {
+    if (ANALYSIS_STATE.statusPolling) {
+        clearInterval(ANALYSIS_STATE.statusPolling);
+    }
+    
+    ANALYSIS_STATE.statusPolling = setInterval(async () => {
+        try {
+            await checkAnalysisStatus();
+        } catch (error) {
+            console.error('Status polling error:', error);
+            ANALYSIS_STATE.retryCount++;
+            
+            if (ANALYSIS_STATE.retryCount >= CONFIG.MAX_RETRIES) {
+                clearInterval(ANALYSIS_STATE.statusPolling);
+                ANALYSIS_STATE.statusPolling = null;
+                showError('Lost connection to analysis. Please refresh the page and check results manually.');
+                resetToFormState();
+            }
+        }
+    }, CONFIG.STATUS_POLL_INTERVAL);
+    
+    // Also check immediately
+    setTimeout(checkAnalysisStatus, 1000);
+}
 
-    const response = await fetch(`${CONFIG.endpoints.status}/${currentAnalysisId}`);
-    const result = await response.json();
-
+async function checkAnalysisStatus() {
+    if (!ANALYSIS_STATE.currentAnalysisId || !ANALYSIS_STATE.isRunning) {
+        return;
+    }
+    
+    const response = await fetch(`${CONFIG.API_BASE}/api/status/${ANALYSIS_STATE.currentAnalysisId}`);
+    
     if (!response.ok) {
-        throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(`Status check failed: ${response.status}`);
     }
-
-    // Enhanced progress display
-    const pct = result.progress_info?.percentage || 0;
-    const desc = result.progress || 'Processing...';
-
-    showProgress(desc, pct);
-
-    // Update enhanced statistics
-    if (result.metadata || result.enhanced_summary) {
-        updateEnhancedStats(result.metadata || {}, result.enhanced_summary || {});
+    
+    const status = await response.json();
+    console.log("📊 Analysis status:", status);
+    
+    // Reset retry count on successful response
+    ANALYSIS_STATE.retryCount = 0;
+    
+    // Update progress
+    if (status.progress_info) {
+        updateProgress(
+            status.progress_info.percentage,
+            status.progress,
+            `Step ${status.progress_info.current_step}/${status.progress_info.total_steps} - ${status.progress_info.elapsed_time} elapsed, ~${status.progress_info.estimated_remaining} remaining`
+        );
+    } else {
+        updateProgress(null, status.progress, status.status);
     }
-
-    // Update progress details
-    if (result.progress_info) {
-        const details = `Step ${result.progress_info.current_step}/${result.progress_info.total_steps} • ${result.progress_info.elapsed_time} elapsed`;
-        updateProgressDetails(details);
-    }
-
-    switch (result.status) {
-        case 'completed':
-            showProgress('Enhanced analysis completed! 🎉', 100);
-            stopProgressPolling();
-            setTimeout(() => loadEnhancedResults(), 1000);
-            break;
-        case 'error':
-            stopProgressPolling();
-            showError(`Enhanced analysis failed: ${result.error || 'Unknown error'}`);
-            updateUI('idle');
-            break;
-        case 'running':
-            statusCheckRetries = 0; // Reset retry counter on successful status
-            break;
-    }
-}
-
-function updateEnhancedStats(metadata, enhancedSummary) {
-    const elements = {
-        'pages-analyzed': metadata.pages_analyzed || enhancedSummary.pages_analyzed || 0,
-        'issues-found': metadata.issues_found || enhancedSummary.issues_found || 0,
-        'cache-hits': metadata.cached_pages || enhancedSummary.pages_from_cache || 0
-    };
-
-    Object.entries(elements).forEach(([id, value]) => {
-        const element = document.getElementById(id);
-        if (element) {
-            animateValue(element, parseInt(element.textContent) || 0, value, 500);
-        }
-    });
-
-    // Update elapsed time
-    if (metadata.elapsed_seconds || metadata.elapsed_formatted) {
-        const timeElement = document.getElementById('elapsed-time');
-        if (timeElement) {
-            timeElement.textContent = metadata.elapsed_formatted || formatDuration(metadata.elapsed_seconds || 0);
-        }
+    
+    // Handle completion
+    if (status.status === 'completed') {
+        clearInterval(ANALYSIS_STATE.statusPolling);
+        ANALYSIS_STATE.statusPolling = null;
+        ANALYSIS_STATE.isRunning = false;
+        
+        updateProgress(100, 'Analysis Complete!', 'Loading results...');
+        
+        setTimeout(() => {
+            loadEnhancedResults();
+        }, 1000);
+        
+    } else if (status.status === 'error') {
+        clearInterval(ANALYSIS_STATE.statusPolling);
+        ANALYSIS_STATE.statusPolling = null;
+        ANALYSIS_STATE.isRunning = false;
+        
+        showError(`Analysis failed: ${status.error || 'Unknown error occurred'}`);
+        resetToFormState();
     }
 }
 
 async function loadEnhancedResults() {
-    console.log('📊 Loading enhanced results...');
-    
-    if (!currentAnalysisId) {
-        console.error('No analysis ID available');
-        return;
-    }
-
     try {
-        // Show results section
-        updateUI('completed');
+        showMessage('Loading comprehensive results...', 'info');
         
-        // Fetch the report
-        const response = await fetch(`${CONFIG.endpoints.report}/${currentAnalysisId}`);
+        const response = await fetch(`${CONFIG.API_BASE}/api/report/${ANALYSIS_STATE.currentAnalysisId}`);
         
         if (!response.ok) {
-            throw new Error(`Failed to load results: ${response.status}`);
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to load results');
         }
         
-        const data = await response.json();
+        const result = await response.json();
+        console.log("📊 Enhanced results loaded:", result);
         
-        // Display the report
-        displayEnhancedReport(data);
-        
-        // Scroll to results
-        const resultsSection = document.getElementById('results-section');
-        if (resultsSection) {
-            resultsSection.scrollIntoView({ behavior: 'smooth' });
-        }
+        displayResults(result);
         
     } catch (error) {
-        console.error('❌ Error loading results:', error);
-        showError('Failed to load results: ' + error.message);
+        console.error('Error loading results:', error);
+        showError(`Failed to load results: ${error.message}`);
+        resetToFormState();
     }
 }
 
-function displayEnhancedReport(data) {
-    console.log('📋 Displaying enhanced report...', data);
+function displayResults(result) {
+    showResultsState();
     
-    // Update report content
-    const reportContent = document.getElementById('report-content');
-    if (reportContent && data.report) {
-        // Convert markdown to HTML (simple conversion)
-        const htmlReport = convertMarkdownToHTML(data.report);
-        reportContent.innerHTML = htmlReport;
+    // Display the report content
+    if (DOM.reportContent && result.report) {
+        // Convert markdown to HTML (basic conversion)
+        const htmlContent = convertMarkdownToHTML(result.report);
+        DOM.reportContent.innerHTML = htmlContent;
     }
     
-    // Update metadata
-    const metadata = data.metadata || {};
-    const enhanced = data.enhanced_features || {};
-    
-    // Update SEO score
-    const seoScore = metadata.seo_score || 0;
-    updateSEOScoreDisplay(seoScore);
-    
-    // Update statistics
-    updateFinalStats(metadata, enhanced);
-    
-    // Show download button if CSV is available
-    const downloadBtn = document.getElementById('download-csv-btn');
-    if (downloadBtn && data.enhanced_features?.has_csv_export) {
-        downloadBtn.style.display = 'inline-block';
-        downloadBtn.onclick = () => downloadCSV(currentAnalysisId);
+    // Enable CSV download if available
+    if (DOM.csvDownloadBtn && result.metadata && result.metadata.status === 'success') {
+        DOM.csvDownloadBtn.style.display = 'inline-block';
     }
     
-    // Update analysis info
-    updateAnalysisInfo(data);
+    showMessage('Analysis completed successfully!', 'success');
 }
 
 function convertMarkdownToHTML(markdown) {
     return markdown
-        // Headers
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        // Bold and italic
-        .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-        .replace(/\*(.*)\*/gim, '<em>$1</em>')
-        // Lists
-        .replace(/^\- (.*$)/gim, '<li>$1</li>')
-        // Line breaks
-        .replace(/\n$/gim, '<br>')
-        // Tables (basic)
+        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
+        .replace(/^\* (.*$)/gm, '<li>$1</li>')
+        .replace(/^- (.*$)/gm, '<li>$1</li>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/^\|(.*)\|$/gm, '<tr>$1</tr>')
         .replace(/\|/g, '</td><td>')
-        .replace(/^(.*\|.*)/gim, '<tr><td>$1</td></tr>')
-        // Wrap table rows
-        .replace(/(<tr>.*<\/tr>)/gim, '<table class="table table-striped">$1</table>');
+        .replace(/<tr><td>/g, '<tr><td>')
+        .replace(/<\/td><td><\/tr>/g, '</td></tr>')
+        .replace(/\n/g, '<br>');
 }
 
-function updateSEOScoreDisplay(score) {
-    const scoreElement = document.getElementById('seo-score');
-    const scoreBar = document.getElementById('seo-score-bar');
-    const scoreText = document.getElementById('seo-score-text');
-    
-    if (scoreElement) {
-        animateValue(scoreElement, 0, score, 1000);
-    }
-    
-    if (scoreBar) {
-        scoreBar.style.width = score + '%';
-        scoreBar.className = `progress-bar ${getScoreColor(score)}`;
-    }
-    
-    if (scoreText) {
-        scoreText.textContent = getScoreDescription(score);
-        scoreText.className = `badge ${getScoreColor(score).replace('bg-', 'bg-')}`;
-    }
+// UI State Management
+function showProgressState() {
+    setUIState('progress');
 }
 
-function getScoreColor(score) {
-    if (score >= 80) return 'bg-success';
-    if (score >= 60) return 'bg-warning';
-    return 'bg-danger';
+function showResultsState() {
+    setUIState('results');
 }
 
-function getScoreDescription(score) {
-    if (score >= 80) return 'Excellent';
-    if (score >= 60) return 'Good';
-    if (score >= 40) return 'Needs Work';
-    return 'Poor';
+function resetToFormState() {
+    setUIState('form');
 }
 
-function updateFinalStats(metadata, enhanced) {
-    const stats = {
-        'final-pages': metadata.pages_analyzed || 0,
-        'final-issues': metadata.issues_found || 0,
-        'final-duration': formatDuration(metadata.crawl_duration || 0),
-        'final-cache': metadata.cached_pages || 0
-    };
-    
-    Object.entries(stats).forEach(([id, value]) => {
+function setUIState(state) {
+    // Hide all sections
+    const sections = ['form-section', 'progress-section', 'results-section'];
+    sections.forEach(id => {
         const element = document.getElementById(id);
-        if (element) {
-            if (typeof value === 'number') {
-                animateValue(element, 0, value, 800);
-            } else {
-                element.textContent = value;
-            }
-        }
+        if (element) element.style.display = 'none';
     });
-}
-
-function updateAnalysisInfo(data) {
-    const infoElement = document.getElementById('analysis-info');
-    if (infoElement && data.metadata) {
-        const info = [
-            `Analysis Type: ${data.metadata.whole_website_analysis ? 'Whole Website' : 'Selective Pages'}`,
-            `SERP Analysis: ${data.metadata.serp_results_count > 0 ? 'Enabled' : 'Disabled'}`,
-            `Caching: ${data.metadata.cached_pages > 0 ? 'Used' : 'Not Used'}`,
-            `Generated: ${new Date().toLocaleString()}`
-        ];
-        infoElement.innerHTML = info.map(i => `<small class="text-muted d-block">${i}</small>`).join('');
+    
+    // Show appropriate section
+    const targetSection = document.getElementById(`${state}-section`);
+    if (targetSection) {
+        targetSection.style.display = 'block';
     }
+    
+    // Update button states
+    updateButtonStates(state);
 }
 
-// Utility functions
-function updateUI(state) {
-    const elements = {
-        form: document.getElementById('analysis-form'),
-        progress: document.getElementById('progress-section'),
-        results: document.getElementById('results-section'),
-        startBtn: document.getElementById('start-analysis')
+function updateButtonStates(state) {
+    const buttons = {
+        start: DOM.startBtn,
+        cancel: DOM.cancelBtn,
+        new: DOM.newAnalysisBtn,
+        csvDownload: DOM.csvDownloadBtn
     };
-
+    
+    // Hide all buttons first
+    Object.values(buttons).forEach(btn => {
+        if (btn) btn.style.display = 'none';
+    });
+    
+    // Show appropriate buttons based on state
     switch (state) {
-        case 'idle':
-            if (elements.form) elements.form.style.display = 'block';
-            if (elements.progress) elements.progress.style.display = 'none';
-            if (elements.results) elements.results.style.display = 'none';
-            if (elements.startBtn) {
-                elements.startBtn.disabled = false;
-                elements.startBtn.innerHTML = '<i class="fas fa-search me-2"></i>Start Enhanced Analysis';
-            }
+        case 'form':
+            if (buttons.start) buttons.start.style.display = 'inline-block';
             break;
-        case 'starting':
-        case 'running':
-            if (elements.form) elements.form.style.display = 'none';
-            if (elements.progress) elements.progress.style.display = 'block';
-            if (elements.results) elements.results.style.display = 'none';
-            if (elements.startBtn) {
-                elements.startBtn.disabled = true;
-                elements.startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
-            }
+        case 'progress':
+            if (buttons.cancel) buttons.cancel.style.display = 'inline-block';
             break;
-        case 'completed':
-            if (elements.form) elements.form.style.display = 'none';
-            if (elements.progress) elements.progress.style.display = 'none';
-            if (elements.results) elements.results.style.display = 'block';
+        case 'results':
+            if (buttons.new) buttons.new.style.display = 'inline-block';
+            if (buttons.csvDownload) buttons.csvDownload.style.display = 'inline-block';
             break;
     }
 }
 
-function showProgress(message, percentage) {
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
-    
-    if (progressBar) {
-        progressBar.style.width = percentage + '%';
-        progressBar.setAttribute('aria-valuenow', percentage);
+function updateProgress(percentage, message, details) {
+    if (DOM.progressText) {
+        DOM.progressText.textContent = message || 'Processing...';
     }
     
-    if (progressText) {
-        progressText.textContent = message;
+    if (DOM.progressDetails) {
+        DOM.progressDetails.textContent = details || '';
     }
-}
-
-function updateProgressDetails(details) {
-    const detailsElement = document.getElementById('progress-details');
-    if (detailsElement) {
-        detailsElement.textContent = details;
-    }
-}
-
-function stopProgressPolling() {
-    if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-    }
-}
-
-function handleProgressError(error) {
-    statusCheckRetries++;
-    if (statusCheckRetries >= MAX_STATUS_RETRIES) {
-        stopProgressPolling();
-        showError('Analysis status check failed after multiple retries. Please refresh the page and try again.');
-        updateUI('idle');
+    
+    if (DOM.progressFill && percentage !== null) {
+        const safePercentage = Math.min(100, Math.max(0, percentage));
+        DOM.progressFill.style.width = `${safePercentage}%`;
+        
+        // Add some visual feedback
+        if (safePercentage < 100) {
+            DOM.progressFill.style.backgroundColor = '#3498db';
+        } else {
+            DOM.progressFill.style.backgroundColor = '#27ae60';
+        }
     }
 }
 
 function showError(message) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-    alertDiv.innerHTML = `
-        <i class="fas fa-exclamation-triangle me-2"></i>
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
+    showMessage(message, 'error');
+}
+
+function showMessage(message, type = 'info') {
+    if (!DOM.errorMessage) return;
     
-    const container = document.querySelector('.container');
-    if (container) {
-        container.insertBefore(alertDiv, container.firstChild);
+    if (!message) {
+        DOM.errorMessage.style.display = 'none';
+        return;
     }
-}
-
-function showFieldError(fieldName, message) {
-    const field = document.getElementById(fieldName);
-    if (field) {
-        field.classList.add('is-invalid');
-        
-        let feedback = field.parentElement.querySelector('.invalid-feedback');
-        if (!feedback) {
-            feedback = document.createElement('div');
-            feedback.className = 'invalid-feedback';
-            field.parentElement.appendChild(feedback);
-        }
-        feedback.textContent = message;
-    }
-}
-
-function clearFieldError(event) {
-    const field = event.target;
-    field.classList.remove('is-invalid');
     
-    const feedback = field.parentElement.querySelector('.invalid-feedback');
-    if (feedback) {
-        feedback.remove();
-    }
-}
-
-function validateField(event) {
-    const field = event.target;
-    const value = field.value.trim();
+    DOM.errorMessage.textContent = message;
+    DOM.errorMessage.className = `alert alert-${type}`;
+    DOM.errorMessage.style.display = 'block';
     
-    if (field.id === 'website_url' && !validateUrl(value)) {
-        showFieldError(field.id, 'Please enter a valid website URL');
-    } else if (field.id === 'target_keyword' && !validateKeyword(value)) {
-        showFieldError(field.id, 'Please enter a valid target keyword');
+    // Auto-hide success messages
+    if (type === 'success') {
+        setTimeout(() => {
+            if (DOM.errorMessage) {
+                DOM.errorMessage.style.display = 'none';
+            }
+        }, 5000);
     }
 }
 
-function validateUrl(url) {
+// System Health Check
+async function performHealthCheck() {
     try {
-        new URL(url.startsWith('http') ? url : 'https://' + url);
-        return true;
-    } catch {
-        return false;
+        const response = await fetch(`${CONFIG.API_BASE}/api/health`);
+        const health = await response.json();
+        
+        console.log("🏥 System health check:", health);
+        
+        if (DOM.systemStatus) {
+            if (health.status === 'healthy') {
+                DOM.systemStatus.innerHTML = '<span style="color: green;">● System Online</span>';
+            } else {
+                DOM.systemStatus.innerHTML = '<span style="color: red;">● System Issues</span>';
+            }
+        }
+        
+    } catch (error) {
+        console.error('Health check failed:', error);
+        if (DOM.systemStatus) {
+            DOM.systemStatus.innerHTML = '<span style="color: red;">● Connection Error</span>';
+        }
     }
 }
 
-function validateKeyword(keyword) {
-    return keyword.length >= 2 && keyword.length <= 100;
+// Update UI based on current state
+function updateUI() {
+    // Set initial state
+    resetToFormState();
+    
+    // Configure whole website toggle
+    handleWholeWebsiteToggle();
 }
 
-function animateValue(element, start, end, duration) {
-    const startTimestamp = performance.now();
-    const step = (timestamp) => {
-        const elapsed = timestamp - startTimestamp;
-        const progress = Math.min(elapsed / duration, 1);
-        const current = start + (end - start) * progress;
-        
-        element.textContent = Math.floor(current);
-        
-        if (progress < 1) {
-            requestAnimationFrame(step);
-        }
-    };
-    requestAnimationFrame(step);
+// Utility Functions
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 function formatDuration(seconds) {
-    if (seconds < 60) {
-        return `${seconds}s`;
-    } else if (seconds < 3600) {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}m ${remainingSeconds}s`;
-    } else {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        return `${hours}h ${minutes}m`;
-    }
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}m ${remainingSeconds}s`;
 }
 
-function startNewAnalysis() {
-    currentAnalysisId = null;
-    statusCheckRetries = 0;
-    stopProgressPolling();
-    updateUI('idle');
-    
-    // Clear form
-    const form = document.getElementById('analysis-form');
-    if (form) {
-        form.reset();
-        form.classList.remove('was-validated');
-    }
-    
-    // Clear any error messages
-    document.querySelectorAll('.alert').forEach(alert => alert.remove());
-    document.querySelectorAll('.is-invalid').forEach(field => {
-        field.classList.remove('is-invalid');
-    });
-    document.querySelectorAll('.invalid-feedback').forEach(feedback => feedback.remove());
-}
+// Export for global access
+window.EnhancedSEOAudit = {
+    startAnalysis: handleStartAnalysis,
+    cancelAnalysis: handleCancelAnalysis,
+    downloadCSV: handleCSVDownload,
+    healthCheck: performHealthCheck,
+    state: ANALYSIS_STATE,
+    config: CONFIG
+};
 
-async function downloadCSV(analysisId) {
-    try {
-        const response = await fetch(`${CONFIG.endpoints.downloadCsv}/${analysisId}`);
-        
-        if (!response.ok) {
-            throw new Error('Failed to download CSV');
-        }
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `seo-analysis-${analysisId}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-    } catch (error) {
-        console.error('❌ CSV download failed:', error);
-        showError('Failed to download CSV: ' + error.message);
-    }
-}
-
-// Admin functions
-async function clearCache() {
-    if (!confirm('Are you sure you want to clear the analysis cache? This will remove all cached page data.')) {
-        return;
-    }
-
-    try {
-        const response = await fetch(CONFIG.endpoints.clearCache, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            alert(`Cache cleared successfully! ${result.pages_cleared} pages removed.`);
-        } else {
-            throw new Error(result.error || 'Failed to clear cache');
-        }
-    } catch (error) {
-        alert('Error clearing cache: ' + error.message);
-    }
-}
-
-async function checkSystemHealth() {
-    try {
-        const response = await fetch(CONFIG.endpoints.health);
-        const health = await response.json();
-
-        console.log('🏥 System health check:', health);
-
-        // Update status indicator if present
-        const statusIndicator = document.querySelector('.status-indicator .badge');
-        if (statusIndicator) {
-            if (health.status === 'healthy') {
-                statusIndicator.className = 'badge bg-success';
-                statusIndicator.innerHTML = '<i class="fas fa-check-circle me-1"></i>Online';
-            } else {
-                statusIndicator.className = 'badge bg-danger';
-                statusIndicator.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i>Issues';
-            }
-        }
-    } catch (error) {
-        console.warn('❌ Health check failed:', error);
-    }
-}
-
-// Keyboard shortcuts
-document.addEventListener('keydown', function(event) {
-    // Ctrl/Cmd + Enter to start analysis
-    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        const form = document.getElementById('analysis-form');
-        if (form && !document.getElementById('start-analysis').disabled) {
-            form.dispatchEvent(new Event('submit'));
-        }
-    }
-
-    // Escape to cancel/reset
-    if (event.key === 'Escape' && currentAnalysisId) {
-        if (confirm('Cancel the current analysis?')) {
-            startNewAnalysis();
-        }
-    }
-});
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', function() {
-    stopProgressPolling();
-});
-
-console.log('🎯 Enhanced SEO Audit Tool V3.0 JavaScript loaded successfully!');
+console.log("✅ Enhanced SEO Audit Tool V3.0 JavaScript initialization complete!");
