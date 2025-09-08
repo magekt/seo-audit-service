@@ -8,7 +8,7 @@ console.log("🎯 Enhanced SEO Audit Tool V3.0 JavaScript loaded successfully!")
 // Configuration and State Management
 const CONFIG = {
     API_BASE: window.location.origin,
-    STATUS_POLL_INTERVAL: 3000,
+    STATUS_POLL_INTERVAL: 2000, // Reduced to 2 seconds for better responsiveness
     MAX_RETRIES: 3,
     RETRY_DELAY: 2000
 };
@@ -69,12 +69,20 @@ function initializeDOMElements() {
         // Health check
         systemStatus: document.getElementById('system-status')
     };
+
+    // Debug: Log which elements were found
+    console.log("DOM Elements initialized:", {
+        formFound: !!DOM.seoForm,
+        toggleFound: !!DOM.wholeWebsiteToggle,
+        maxPagesFound: !!DOM.maxPagesInput
+    });
 }
 
 function setupEventListeners() {
     // Form submission
     if (DOM.seoForm) {
         DOM.seoForm.addEventListener('submit', handleEnhancedFormSubmit);
+        console.log("✅ Form submit listener added");
     }
     
     // Control buttons
@@ -94,9 +102,18 @@ function setupEventListeners() {
         DOM.csvDownloadBtn.addEventListener('click', handleCSVDownload);
     }
     
-    // Input validation
+    // FIXED: Toggle functionality with proper event handling
     if (DOM.wholeWebsiteToggle) {
         DOM.wholeWebsiteToggle.addEventListener('change', handleWholeWebsiteToggle);
+        DOM.wholeWebsiteToggle.addEventListener('click', handleWholeWebsiteToggle);
+        console.log("✅ Whole website toggle listener added");
+        
+        // Initialize toggle state
+        setTimeout(() => {
+            handleWholeWebsiteToggle();
+        }, 100);
+    } else {
+        console.error("❌ Whole website toggle not found!");
     }
 }
 
@@ -108,6 +125,8 @@ async function handleEnhancedFormSubmit(event) {
         showError(''); // Clear any previous errors
         
         const formData = getFormData();
+        console.log("📋 Form data collected:", formData);
+        
         const validationResult = validateFormData(formData);
         
         if (!validationResult.isValid) {
@@ -126,7 +145,7 @@ async function handleEnhancedFormSubmit(event) {
 
 async function handleStartAnalysis() {
     if (DOM.seoForm) {
-        const event = new Event('submit');
+        const event = new Event('submit', { bubbles: true, cancelable: true });
         DOM.seoForm.dispatchEvent(event);
     }
 }
@@ -166,15 +185,64 @@ function handleNewAnalysis() {
     // Reset UI
     resetToFormState();
     showError('');
+    
+    // Re-initialize toggle state
+    setTimeout(() => {
+        handleWholeWebsiteToggle();
+    }, 100);
 }
 
+// FIXED: Improved toggle handling with visual feedback
 function handleWholeWebsiteToggle() {
+    console.log("🔄 Toggle changed");
+    
+    if (!DOM.wholeWebsiteToggle || !DOM.maxPagesInput) {
+        console.error("❌ Toggle elements not found");
+        return;
+    }
+    
     const isWholeWebsite = DOM.wholeWebsiteToggle.checked;
-    const maxPagesGroup = DOM.maxPagesInput?.closest('.form-group');
+    const maxPagesGroup = DOM.maxPagesInput.closest('.form-group');
+    
+    console.log("🎯 Whole website mode:", isWholeWebsite);
     
     if (maxPagesGroup) {
-        maxPagesGroup.style.opacity = isWholeWebsite ? '0.5' : '1';
-        DOM.maxPagesInput.disabled = isWholeWebsite;
+        if (isWholeWebsite) {
+            maxPagesGroup.style.opacity = '0.5';
+            maxPagesGroup.style.pointerEvents = 'none';
+            DOM.maxPagesInput.disabled = true;
+            
+            // Show whole website message
+            let helpText = maxPagesGroup.querySelector('small');
+            if (helpText) {
+                helpText.textContent = 'Whole website mode: Will discover and analyze ALL pages';
+                helpText.style.color = '#e67e22';
+                helpText.style.fontWeight = 'bold';
+            }
+        } else {
+            maxPagesGroup.style.opacity = '1';
+            maxPagesGroup.style.pointerEvents = 'auto';
+            DOM.maxPagesInput.disabled = false;
+            
+            // Restore original message
+            let helpText = maxPagesGroup.querySelector('small');
+            if (helpText) {
+                helpText.textContent = 'For focused analysis, start with 5-20 pages';
+                helpText.style.color = '';
+                helpText.style.fontWeight = '';
+            }
+        }
+    }
+    
+    // Update button text based on mode
+    if (DOM.startBtn) {
+        if (isWholeWebsite) {
+            DOM.startBtn.innerHTML = '🌐 Start Whole Website Analysis';
+            DOM.startBtn.style.background = '#e67e22';
+        } else {
+            DOM.startBtn.innerHTML = '🚀 Start Enhanced SEO Analysis';
+            DOM.startBtn.style.background = '';
+        }
     }
 }
 
@@ -212,7 +280,7 @@ async function handleCSVDownload() {
 }
 
 function getFormData() {
-    return {
+    const formData = {
         website_url: DOM.websiteUrlInput?.value?.trim() || '',
         target_keyword: DOM.targetKeywordInput?.value?.trim() || '',
         max_pages: parseInt(DOM.maxPagesInput?.value) || 10,
@@ -220,6 +288,9 @@ function getFormData() {
         serp_analysis: DOM.serpAnalysisToggle?.checked !== false,
         use_cache: true
     };
+    
+    console.log("📝 Form data:", formData);
+    return formData;
 }
 
 function validateFormData(data) {
@@ -235,10 +306,10 @@ function validateFormData(data) {
     try {
         new URL(data.website_url);
     } catch (e) {
-        return { isValid: false, message: 'Please enter a valid URL' };
+        return { isValid: false, message: 'Please enter a valid URL (include https://)' };
     }
     
-    // Pages validation
+    // Pages validation (only for non-whole website mode)
     if (!data.whole_website && (data.max_pages < 1 || data.max_pages > 100)) {
         return { isValid: false, message: 'Pages to analyze must be between 1 and 100' };
     }
@@ -253,6 +324,10 @@ async function startEnhancedAnalysis(formData) {
         
         ANALYSIS_STATE.isRunning = true;
         ANALYSIS_STATE.retryCount = 0;
+        
+        // Add analysis mode to progress message
+        const analysisType = formData.whole_website ? 'Whole Website Analysis' : 'Selective Page Analysis';
+        updateProgress(5, `Starting ${analysisType}...`, `Preparing to analyze ${formData.website_url}`);
         
         const response = await fetchWithRetry(`${CONFIG.API_BASE}/api/analyze`, {
             method: 'POST',
@@ -285,6 +360,11 @@ async function startEnhancedAnalysis(formData) {
         console.log("✅ Analysis started:", result);
         
         ANALYSIS_STATE.currentAnalysisId = result.analysis_id;
+        
+        // Show analysis details
+        const estimatedTime = formData.whole_website ? '5-30 minutes' : '1-5 minutes';
+        updateProgress(10, `Analysis started successfully!`, 
+            `Analysis ID: ${result.analysis_id.substr(0, 8)}... | Estimated time: ${estimatedTime}`);
         
         // Start polling for status
         startStatusPolling();
@@ -349,15 +429,15 @@ async function checkAnalysisStatus() {
     // Reset retry count on successful response
     ANALYSIS_STATE.retryCount = 0;
     
-    // Update progress
+    // Update progress with enhanced information
     if (status.progress_info) {
         updateProgress(
             status.progress_info.percentage,
             status.progress,
-            `Step ${status.progress_info.current_step}/${status.progress_info.total_steps} - ${status.progress_info.elapsed_time} elapsed, ~${status.progress_info.estimated_remaining} remaining`
+            `Step ${status.progress_info.current_step}/${status.progress_info.total_steps} | ${status.progress_info.elapsed_time} elapsed | ~${status.progress_info.estimated_remaining} remaining`
         );
     } else {
-        updateProgress(null, status.progress, status.status);
+        updateProgress(null, status.progress || 'Processing...', status.status || 'Running analysis...');
     }
     
     // Handle completion
@@ -366,7 +446,7 @@ async function checkAnalysisStatus() {
         ANALYSIS_STATE.statusPolling = null;
         ANALYSIS_STATE.isRunning = false;
         
-        updateProgress(100, 'Analysis Complete!', 'Loading results...');
+        updateProgress(100, '✅ Analysis Complete!', 'Loading comprehensive results...');
         
         setTimeout(() => {
             loadEnhancedResults();
@@ -377,7 +457,7 @@ async function checkAnalysisStatus() {
         ANALYSIS_STATE.statusPolling = null;
         ANALYSIS_STATE.isRunning = false;
         
-        showError(`Analysis failed: ${status.error || 'Unknown error occurred'}`);
+        showError(`❌ Analysis failed: ${status.error || 'Unknown error occurred'}`);
         resetToFormState();
     }
 }
@@ -410,9 +490,13 @@ function displayResults(result) {
     
     // Display the report content
     if (DOM.reportContent && result.report) {
-        // Convert markdown to HTML (basic conversion)
+        // Enhanced markdown to HTML conversion
         const htmlContent = convertMarkdownToHTML(result.report);
         DOM.reportContent.innerHTML = htmlContent;
+        
+        // Add some styling to the results
+        DOM.reportContent.style.maxHeight = 'none';
+        DOM.reportContent.style.overflow = 'visible';
     }
     
     // Enable CSV download if available
@@ -420,24 +504,53 @@ function displayResults(result) {
         DOM.csvDownloadBtn.style.display = 'inline-block';
     }
     
-    showMessage('Analysis completed successfully!', 'success');
+    // Show enhanced completion message
+    const pagesAnalyzed = result.metadata?.pages_analyzed || 'Unknown';
+    const duration = result.metadata?.crawl_duration ? 
+        ` in ${Math.round(result.metadata.crawl_duration)}s` : '';
+    
+    showMessage(`🎉 Analysis completed successfully! Analyzed ${pagesAnalyzed} pages${duration}`, 'success');
 }
 
+// Enhanced markdown to HTML conversion
 function convertMarkdownToHTML(markdown) {
     return markdown
-        .replace(/^# (.*)$/gm, '<h1>$1</h1>')
-        .replace(/^## (.*)$/gm, '<h2>$2</h2>')
-        .replace(/^### (.*)$/gm, '<h3>$1</h3>')
-        .replace(/^#### (.*)$/gm, '<h4>$1</h4>')
-        .replace(/^\* (.*)$/gm, '<li>$1</li>')
-        .replace(/^- (.*)$/gm, '<li>$1</li>')
+        // Headers
+        .replace(/^# (.*$)/gm, '<h1 class="seo-h1">$1</h1>')
+        .replace(/^## (.*$)/gm, '<h2 class="seo-h2">$1</h2>')
+        .replace(/^### (.*$)/gm, '<h3 class="seo-h3">$1</h3>')
+        .replace(/^#### (.*$)/gm, '<h4 class="seo-h4">$1</h4>')
+        
+        // Bold and italic
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/^\|(.*)\|$/gm, '<tr>$1</tr>')
-        .replace(/\|/g, '</td><td>')
-        .replace(/<td><\/td>/g, '<td>')
-        .replace(/<\/td><\/tr>/g, '</td></tr>')
-        .replace(/\n/g, '<br>');
+        
+        // Lists (improved)
+        .replace(/^\* (.*$)/gm, '<li>$1</li>')
+        .replace(/^- (.*$)/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+        
+        // Tables (improved)
+        .replace(/^\|(.*)\|$/gm, function(match, content) {
+            const cells = content.split('|').map(cell => `<td>${cell.trim()}</td>`).join('');
+            return `<tr>${cells}</tr>`;
+        })
+        .replace(/(<tr>.*<\/tr>\s*)+/gs, function(match) {
+            return `<table class="seo-table">${match}</table>`;
+        })
+        
+        // Line breaks
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        
+        // Wrap in paragraphs
+        .replace(/^(?!<[h|u|t|l])/gm, '<p>')
+        .replace(/(?<!>)$/gm, '</p>')
+        
+        // Clean up empty paragraphs
+        .replace(/<p><\/p>/g, '')
+        .replace(/<p>(<[^>]*>)/g, '$1')
+        .replace(/(<\/[^>]*>)<\/p>/g, '$1');
 }
 
 // UI State Management
@@ -512,11 +625,11 @@ function updateProgress(percentage, message, details) {
         const safePercentage = Math.min(100, Math.max(0, percentage));
         DOM.progressFill.style.width = `${safePercentage}%`;
         
-        // Add some visual feedback
+        // Enhanced visual feedback
         if (safePercentage < 100) {
-            DOM.progressFill.style.backgroundColor = '#3498db';
+            DOM.progressFill.style.background = 'linear-gradient(45deg, #3498db, #2ecc71)';
         } else {
-            DOM.progressFill.style.backgroundColor = '#27ae60';
+            DOM.progressFill.style.background = 'linear-gradient(45deg, #27ae60, #2ecc71)';
         }
     }
 }
@@ -543,7 +656,7 @@ function showMessage(message, type = 'info') {
             if (DOM.errorMessage) {
                 DOM.errorMessage.style.display = 'none';
             }
-        }, 5000);
+        }, 8000); // Increased to 8 seconds
     }
 }
 
@@ -557,16 +670,19 @@ async function performHealthCheck() {
         
         if (DOM.systemStatus) {
             if (health.status === 'healthy') {
-                DOM.systemStatus.innerHTML = '● System Online';
+                DOM.systemStatus.innerHTML = '🟢 System Online';
+                DOM.systemStatus.style.color = '#27ae60';
             } else {
-                DOM.systemStatus.innerHTML = '● System Issues';
+                DOM.systemStatus.innerHTML = '🟡 System Issues';
+                DOM.systemStatus.style.color = '#f39c12';
             }
         }
         
     } catch (error) {
         console.error('Health check failed:', error);
         if (DOM.systemStatus) {
-            DOM.systemStatus.innerHTML = '● Connection Error';
+            DOM.systemStatus.innerHTML = '🔴 Connection Error';
+            DOM.systemStatus.style.color = '#e74c3c';
         }
     }
 }
@@ -577,7 +693,9 @@ function updateUI() {
     resetToFormState();
     
     // Configure whole website toggle
-    handleWholeWebsiteToggle();
+    setTimeout(() => {
+        handleWholeWebsiteToggle();
+    }, 100);
 }
 
 // Utility Functions
