@@ -2,11 +2,20 @@ services:
   - type: web
     name: seo-audit-service
     env: python
+    region: us-central1
     plan: free
+    runtime: python-3.11
     buildCommand: |
-      pip install --upgrade pip setuptools wheel
+      python --version
+      echo "Current Python version check..."
+      if python --version | grep -q "3.13"; then
+        echo "ERROR: Python 3.13 detected - this will cause build failures"
+        echo "Please ensure Python 3.11 is being used"
+        exit 1
+      fi
+      python -m pip install --upgrade pip
       pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app --workers 2 --timeout 120 --max-requests 1000 --max-requests-jitter 50
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app --workers 2 --timeout 120 --preload
     envVars:
       - key: FLASK_ENV
         value: production
