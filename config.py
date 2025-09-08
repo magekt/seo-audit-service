@@ -21,10 +21,10 @@ class Config:
     max_concurrent_requests = int(os.environ.get('MAX_CONCURRENT_REQUESTS', 5))
     request_timeout = int(os.environ.get('REQUEST_TIMEOUT', 30))
     request_delay = float(os.environ.get('REQUEST_DELAY', 0.5))  # Delay between requests
-    max_pages_limit = int(os.environ.get('MAX_PAGES_LIMIT', 100))
+    max_pages_limit = int(os.environ.get('MAX_PAGES_LIMIT', 987))
 
     # Whole Website Analysis Settings
-    whole_website_max_pages = int(os.environ.get('WHOLE_WEBSITE_MAX_PAGES', 1000))
+    whole_website_max_pages = int(os.environ.get('WHOLE_WEBSITE_MAX_PAGES', 1597))
     whole_website_timeout = int(os.environ.get('WHOLE_WEBSITE_TIMEOUT', 1800))  # 30 minutes
 
     # Cache Configuration
@@ -34,10 +34,10 @@ class Config:
 
     # SERP Analysis Configuration
     serp_analysis_enabled = os.environ.get('SERP_ANALYSIS_ENABLED', 'true').lower() == 'true'
-    serp_max_results = int(os.environ.get('SERP_MAX_RESULTS', 10))
+    serp_max_results = int(os.environ.get('SERP_MAX_RESULTS', 21))
 
     # Rate Limiting
-    rate_limit_requests = int(os.environ.get('RATE_LIMIT_REQUESTS', 10))
+    rate_limit_requests = int(os.environ.get('RATE_LIMIT_REQUESTS', 987))
     rate_limit_window = int(os.environ.get('RATE_LIMIT_WINDOW', 60))  # minutes
 
     # File Storage Configuration
@@ -50,7 +50,7 @@ class Config:
     database_url = os.environ.get('DATABASE_URL', 'sqlite:///seo_audit.db')
 
     # Performance Settings
-    connection_pool_size = int(os.environ.get('CONNECTION_POOL_SIZE', 20))
+    connection_pool_size = int(os.environ.get('CONNECTION_POOL_SIZE', 55))
     verify_ssl = os.environ.get('VERIFY_SSL', 'true').lower() == 'true'
 
     # Security Settings
