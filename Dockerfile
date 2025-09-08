@@ -1,6 +1,7 @@
-# Enhanced SEO Audit Tool V3.0 - Production Dockerfile
+# Enhanced SEO Audit Tool V3.0 - Python 3.11 Dockerfile
+# FIXED for Python 3.13 compatibility issues
 
-FROM python:3.11-slim
+FROM python:3.11.9-slim
 
 # Set working directory
 WORKDIR /app
@@ -17,25 +18,26 @@ RUN apt-get update && apt-get install -y \
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     FLASK_ENV=production \
-    PORT=5000
+    PORT=5000 \
+    PYTHONPATH=/app
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --upgrade pip && \
+# Install Python dependencies with explicit Python 3.11 compatibility
+RUN python -m pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p logs reports exports cache static/img
+RUN mkdir -p logs reports exports cache static/img templates
 
 # Set proper permissions
-RUN chmod +x run.py && \
-    chmod 755 static/ && \
-    chmod 755 templates/
+RUN chmod +x run.py || true && \
+    chmod -R 755 static/ || true && \
+    chmod -R 755 templates/ || true
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
@@ -50,4 +52,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 EXPOSE 5000
 
 # Run the application
-CMD ["python", "run.py"]
+CMD ["python", "app.py"]
