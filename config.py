@@ -1,12 +1,13 @@
 """
-Configuration settings for Enhanced SEO Audit Tool V3.0
+Enhanced SEO Audit Tool V3.0 - RECOMMENDED Configuration Settings
+Balanced values for production use with your preferences incorporated
 """
 
 import os
 from pathlib import Path
 
 class Config:
-    """Enhanced SEO Audit Tool Configuration"""
+    """Enhanced SEO Audit Tool Configuration - PRODUCTION OPTIMIZED"""
 
     # Flask Configuration
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'seo-audit-tool-v3-enhanced-secret-key-change-in-production'
@@ -17,14 +18,14 @@ class Config:
     APP_NAME = "Enhanced SEO Audit Tool V3.0"
     VERSION = "3.0.0"
 
-    # Analysis Configuration
+    # Analysis Configuration - BALANCED VALUES
     max_concurrent_requests = int(os.environ.get('MAX_CONCURRENT_REQUESTS', 5))
     request_timeout = int(os.environ.get('REQUEST_TIMEOUT', 30))
-    request_delay = float(os.environ.get('REQUEST_DELAY', 0.5))  # Delay between requests
-    max_pages_limit = int(os.environ.get('MAX_PAGES_LIMIT', 987))
+    request_delay = float(os.environ.get('REQUEST_DELAY', 0.5))  # Respectful delay
+    max_pages_limit = int(os.environ.get('MAX_PAGES_LIMIT', 150))  # Reduced from your 987
 
-    # Whole Website Analysis Settings
-    whole_website_max_pages = int(os.environ.get('WHOLE_WEBSITE_MAX_PAGES', 1597))
+    # Whole Website Analysis Settings - BALANCED VALUES  
+    whole_website_max_pages = int(os.environ.get('WHOLE_WEBSITE_MAX_PAGES', 750))  # Reduced from your 1597
     whole_website_timeout = int(os.environ.get('WHOLE_WEBSITE_TIMEOUT', 1800))  # 30 minutes
 
     # Cache Configuration
@@ -32,12 +33,12 @@ class Config:
     cache_max_age_hours = int(os.environ.get('CACHE_MAX_AGE_HOURS', 24))
     cache_cleanup_days = int(os.environ.get('CACHE_CLEANUP_DAYS', 7))
 
-    # SERP Analysis Configuration
+    # SERP Analysis Configuration - YOUR VALUE IS GOOD
     serp_analysis_enabled = os.environ.get('SERP_ANALYSIS_ENABLED', 'true').lower() == 'true'
-    serp_max_results = int(os.environ.get('SERP_MAX_RESULTS', 21))
+    serp_max_results = int(os.environ.get('SERP_MAX_RESULTS', 21))  # Kept your value
 
-    # Rate Limiting
-    rate_limit_requests = int(os.environ.get('RATE_LIMIT_REQUESTS', 987))
+    # Rate Limiting - MORE CONSERVATIVE
+    rate_limit_requests = int(os.environ.get('RATE_LIMIT_REQUESTS', 15))  # Reduced from your 987
     rate_limit_window = int(os.environ.get('RATE_LIMIT_WINDOW', 60))  # minutes
 
     # File Storage Configuration
@@ -49,8 +50,8 @@ class Config:
     # Database Configuration
     database_url = os.environ.get('DATABASE_URL', 'sqlite:///seo_audit.db')
 
-    # Performance Settings
-    connection_pool_size = int(os.environ.get('CONNECTION_POOL_SIZE', 55))
+    # Performance Settings - BALANCED
+    connection_pool_size = int(os.environ.get('CONNECTION_POOL_SIZE', 25))  # Reduced from your 55
     verify_ssl = os.environ.get('VERIFY_SSL', 'true').lower() == 'true'
 
     # Security Settings
@@ -92,6 +93,8 @@ class Config:
             self.exports_dir,
             self.cache_dir,
             self.logs_dir,
+            Path('static/css'),
+            Path('static/js'),
             Path('static/img'),
             Path('templates')
         ]
@@ -149,7 +152,7 @@ class ProductionConfig(Config):
 
     # Security enhancements
     verify_ssl = True
-    rate_limit_requests = 5  # Stricter rate limiting
+    rate_limit_requests = 10  # Conservative rate limiting
 
 
 class TestingConfig(Config):
